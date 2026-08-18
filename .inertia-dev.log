@@ -1,0 +1,1243 @@
+
+> inertia-scaffold@0.1.0 dev
+> next dev
+
+▲ Next.js 16.3.1 (Turbopack)
+- Local:         http://localhost:3000
+- Network:       http://26.31.66.113:3000
+- Environments: .env.local
+✓ Ready in 879ms
+✓ Running next.config.ts took 171ms
+
+ GET /login 200 in 585ms (next.js: 251ms, application-code: 334ms)
+ GET /cadastro 200 in 846ms (next.js: 806ms, application-code: 39ms)
+ GET /convite/teste 200 in 717ms (next.js: 671ms, application-code: 46ms)
+ GET /app 200 in 77ms (next.js: 31ms, application-code: 46ms)
+ GET /app/livro/0a80a0a1-69a0-45cc-bf30-be20f3972c35/capitulo/d7cdbdb4-07dd-48db-9bdc-5b3de4e64aff 200 in 1162ms (next.js: 1015ms, application-code: 148ms)
+ GET /app/livro/0a80a0a1-69a0-45cc-bf30-be20f3972c35/capitulo/d7cdbdb4-07dd-48db-9bdc-5b3de4e64aff 200 in 73ms (next.js: 14ms, application-code: 59ms)
+ GET /app/livro/0a80a0a1-69a0-45cc-bf30-be20f3972c35/capitulo/d7cdbdb4-07dd-48db-9bdc-5b3de4e64aff 200 in 89ms (next.js: 16ms, application-code: 73ms)
+ GET /app/livro/0a80a0a1-69a0-45cc-bf30-be20f3972c35 200 in 764ms (next.js: 735ms, application-code: 29ms)
+✓ Compiled in 87ms
+✓ Compiled in 74ms
+ GET /app/livro/0a80a0a1-69a0-45cc-bf30-be20f3972c35 200 in 72ms (next.js: 18ms, application-code: 54ms)
+ GET /app/livro/0a80a0a1-69a0-45cc-bf30-be20f3972c35/capitulo/d7cdbdb4-07dd-48db-9bdc-5b3de4e64aff 200 in 72ms (next.js: 26ms, application-code: 46ms)
+✓ Compiled in 114ms
+ GET /app/livro/0a80a0a1-69a0-45cc-bf30-be20f3972c35 200 in 131ms (next.js: 17ms, application-code: 114ms)
+ GET /app/livro/0a80a0a1-69a0-45cc-bf30-be20f3972c35/capitulo/d7cdbdb4-07dd-48db-9bdc-5b3de4e64aff 200 in 70ms (next.js: 24ms, application-code: 46ms)
+✓ Compiled in 61ms
+ GET /app/livro/0a80a0a1-69a0-45cc-bf30-be20f3972c35 200 in 61ms (next.js: 18ms, application-code: 43ms)
+ GET /app/livro/0a80a0a1-69a0-45cc-bf30-be20f3972c35/capitulo/d7cdbdb4-07dd-48db-9bdc-5b3de4e64aff 200 in 58ms (next.js: 19ms, application-code: 39ms)
+[browser] ./src/app/app/livro/[bookId]/capitulo/[chapterId]/page.tsx:5:56
+Error: Expected ';', got 'no substitution template literal'
+  3 | ...Params } from "next/navigation"
+  4 | ...Effect,useMemo,useRef,useState } from "react"
+> 5 | ...ltimeChannel } from "@supabase/supabase-js"`r`nimport { createSupabaseBrowserClient } fr...
+    |                                               ^^^
+  6 | ...={id:string;author_id:string;content:string|null;message_type:"story"|"author_note";sequ...
+  7 | ...={id:string;title:string;chapter_number:number}
+  8 | ...lt function ChapterPage(){
+
+Parsing ecmascript source code failed
+
+Import traces:
+  Client Component Browser:
+    ./src/app/app/livro/[bookId]/capitulo/[chapterId]/page.tsx [Client Component Browser]
+    ./src/app/app/livro/[bookId]/capitulo/[chapterId]/page.tsx [Server Component]
+
+  Client Component SSR:
+    ./src/app/app/livro/[bookId]/capitulo/[chapterId]/page.tsx [Client Component SSR]
+    ./src/app/app/livro/[bookId]/capitulo/[chapterId]/page.tsx [Server Component] 
+ GET /app/livro/0a80a0a1-69a0-45cc-bf30-be20f3972c35/capitulo/d7cdbdb4-07dd-48db-9bdc-5b3de4e64aff 200 in 45ms (next.js: 14ms, application-code: 30ms)
+[browser] ./src/app/app/livro/[bookId]/capitulo/[chapterId]/page.tsx:5:56
+Error: Expected ';', got 'no substitution template literal'
+  3 | ...Params } from "next/navigation"
+  4 | ...Effect,useMemo,useRef,useState } from "react"
+> 5 | ...ltimeChannel } from "@supabase/supabase-js"`r`nimport { createSupabaseBrowserClient } fr...
+    |                                               ^^^
+  6 | ...={id:string;author_id:string;content:string|null;message_type:"story"|"author_note";sequ...
+  7 | ...={id:string;title:string;chapter_number:number}
+  8 | ...lt function ChapterPage(){
+
+Parsing ecmascript source code failed
+
+Import traces:
+  Client Component Browser:
+    ./src/app/app/livro/[bookId]/capitulo/[chapterId]/page.tsx [Client Component Browser]
+    ./src/app/app/livro/[bookId]/capitulo/[chapterId]/page.tsx [Server Component]
+
+  Client Component SSR:
+    ./src/app/app/livro/[bookId]/capitulo/[chapterId]/page.tsx [Client Component SSR]
+    ./src/app/app/livro/[bookId]/capitulo/[chapterId]/page.tsx [Server Component] 
+ GET /app/livro/0a80a0a1-69a0-45cc-bf30-be20f3972c35 200 in 36ms (next.js: 13ms, application-code: 23ms)
+ GET /app/livro/0a80a0a1-69a0-45cc-bf30-be20f3972c35/capitulo/d7cdbdb4-07dd-48db-9bdc-5b3de4e64aff 200 in 39ms (next.js: 13ms, application-code: 26ms)
+✓ Compiled in 67ms
+ GET /app/livro/0a80a0a1-69a0-45cc-bf30-be20f3972c35/capitulo/d7cdbdb4-07dd-48db-9bdc-5b3de4e64aff 200 in 146ms (next.js: 23ms, application-code: 123ms)
+ GET /app/livro/0a80a0a1-69a0-45cc-bf30-be20f3972c35/capitulo/d7cdbdb4-07dd-48db-9bdc-5b3de4e64aff 200 in 63ms (next.js: 11ms, application-code: 52ms)
+✓ Finished writing to filesystem cache in 18.5s
+ GET /app/livro/0a80a0a1-69a0-45cc-bf30-be20f3972c35/capitulo/d7cdbdb4-07dd-48db-9bdc-5b3de4e64aff 200 in 188ms (next.js: 69ms, application-code: 120ms)
+ GET /app/livro/0a80a0a1-69a0-45cc-bf30-be20f3972c35 200 in 121ms (next.js: 72ms, application-code: 50ms)
+[browser] Realtime send() is automatically falling back to REST API. This behavior will be deprecated in the future. Please use httpSend() explicitly for REST delivery. (src/app/app/livro/[bookId]/capitulo/[chapterId]/page.tsx:21:891)
+ GET /app 200 in 46ms (next.js: 11ms, application-code: 35ms)
+ GET /app/livro/0a80a0a1-69a0-45cc-bf30-be20f3972c35 200 in 32ms (next.js: 10ms, application-code: 21ms)
+ GET /app/livro/0a80a0a1-69a0-45cc-bf30-be20f3972c35/capitulo/d7cdbdb4-07dd-48db-9bdc-5b3de4e64aff 200 in 38ms (next.js: 12ms, application-code: 25ms)
+ GET /app/livro/0a80a0a1-69a0-45cc-bf30-be20f3972c35 200 in 246ms (next.js: 164ms, application-code: 82ms)
+ GET /app/livro/0a80a0a1-69a0-45cc-bf30-be20f3972c35 200 in 33ms (next.js: 7ms, application-code: 26ms)
+ GET /app/livro/0a80a0a1-69a0-45cc-bf30-be20f3972c35 200 in 42ms (next.js: 8ms, application-code: 34ms)
+ GET /app/livro/0a80a0a1-69a0-45cc-bf30-be20f3972c35 200 in 56ms (next.js: 7ms, application-code: 49ms)
+ GET /app/livro/0a80a0a1-69a0-45cc-bf30-be20f3972c35 200 in 60ms (next.js: 7ms, application-code: 53ms)
+ GET /app/livro/0a80a0a1-69a0-45cc-bf30-be20f3972c35 200 in 58ms (next.js: 8ms, application-code: 51ms)
+ GET /app/livro/0a80a0a1-69a0-45cc-bf30-be20f3972c35 200 in 61ms (next.js: 6ms, application-code: 55ms)
+ GET /app/livro/0a80a0a1-69a0-45cc-bf30-be20f3972c35 200 in 64ms (next.js: 5ms, application-code: 59ms)
+ GET /app/livro/0a80a0a1-69a0-45cc-bf30-be20f3972c35 200 in 43ms (next.js: 7ms, application-code: 37ms)
+ GET /app/livro/0a80a0a1-69a0-45cc-bf30-be20f3972c35 200 in 60ms (next.js: 7ms, application-code: 53ms)
+ GET /app/livro/0a80a0a1-69a0-45cc-bf30-be20f3972c35 200 in 63ms (next.js: 7ms, application-code: 56ms)
+ GET /app/livro/0a80a0a1-69a0-45cc-bf30-be20f3972c35 200 in 39ms (next.js: 7ms, application-code: 32ms)
+ GET /app/livro/0a80a0a1-69a0-45cc-bf30-be20f3972c35 200 in 64ms (next.js: 7ms, application-code: 57ms)
+ GET /app/livro/0a80a0a1-69a0-45cc-bf30-be20f3972c35 200 in 68ms (next.js: 7ms, application-code: 61ms)
+ GET /app/livro/0a80a0a1-69a0-45cc-bf30-be20f3972c35 200 in 74ms (next.js: 8ms, application-code: 66ms)
+ GET /app/livro/0a80a0a1-69a0-45cc-bf30-be20f3972c35 200 in 109ms (next.js: 8ms, application-code: 101ms)
+ GET /app/livro/0a80a0a1-69a0-45cc-bf30-be20f3972c35 200 in 254ms (next.js: 160ms, application-code: 94ms)
+ GET /app/livro/0a80a0a1-69a0-45cc-bf30-be20f3972c35 200 in 49ms (next.js: 8ms, application-code: 42ms)
+ GET /app/livro/0a80a0a1-69a0-45cc-bf30-be20f3972c35 200 in 75ms (next.js: 8ms, application-code: 68ms)
+ GET /app/livro/0a80a0a1-69a0-45cc-bf30-be20f3972c35 200 in 73ms (next.js: 9ms, application-code: 65ms)
+ GET /app/livro/0a80a0a1-69a0-45cc-bf30-be20f3972c35 200 in 88ms (next.js: 7ms, application-code: 82ms)
+ GET /app/livro/0a80a0a1-69a0-45cc-bf30-be20f3972c35 200 in 69ms (next.js: 15ms, application-code: 54ms)
+ GET /app/livro/0a80a0a1-69a0-45cc-bf30-be20f3972c35 200 in 133ms (next.js: 10ms, application-code: 123ms)
+ GET /app/livro/0a80a0a1-69a0-45cc-bf30-be20f3972c35 200 in 134ms (next.js: 8ms, application-code: 126ms)
+ GET /app/livro/0a80a0a1-69a0-45cc-bf30-be20f3972c35 200 in 87ms (next.js: 7ms, application-code: 80ms)
+ GET /app/livro/0a80a0a1-69a0-45cc-bf30-be20f3972c35 200 in 78ms (next.js: 7ms, application-code: 71ms)
+ GET /app/livro/0a80a0a1-69a0-45cc-bf30-be20f3972c35 200 in 73ms (next.js: 7ms, application-code: 66ms)
+ GET /app/livro/0a80a0a1-69a0-45cc-bf30-be20f3972c35 200 in 72ms (next.js: 6ms, application-code: 66ms)
+ GET /app/livro/0a80a0a1-69a0-45cc-bf30-be20f3972c35 200 in 71ms (next.js: 8ms, application-code: 63ms)
+ GET /app/livro/0a80a0a1-69a0-45cc-bf30-be20f3972c35 200 in 74ms (next.js: 8ms, application-code: 66ms)
+ GET /app/livro/0a80a0a1-69a0-45cc-bf30-be20f3972c35 200 in 80ms (next.js: 7ms, application-code: 73ms)
+ GET /app/livro/0a80a0a1-69a0-45cc-bf30-be20f3972c35 200 in 85ms (next.js: 8ms, application-code: 77ms)
+ GET /app/livro/0a80a0a1-69a0-45cc-bf30-be20f3972c35 200 in 85ms (next.js: 9ms, application-code: 77ms)
+ GET /app/livro/0a80a0a1-69a0-45cc-bf30-be20f3972c35 200 in 97ms (next.js: 9ms, application-code: 88ms)
+ GET /app/livro/0a80a0a1-69a0-45cc-bf30-be20f3972c35 200 in 96ms (next.js: 9ms, application-code: 88ms)
+ GET /app/livro/0a80a0a1-69a0-45cc-bf30-be20f3972c35 200 in 97ms (next.js: 9ms, application-code: 88ms)
+ GET /app/livro/0a80a0a1-69a0-45cc-bf30-be20f3972c35 200 in 82ms (next.js: 9ms, application-code: 73ms)
+ GET /app/livro/0a80a0a1-69a0-45cc-bf30-be20f3972c35 200 in 81ms (next.js: 8ms, application-code: 73ms)
+ GET /app/livro/0a80a0a1-69a0-45cc-bf30-be20f3972c35 200 in 77ms (next.js: 11ms, application-code: 65ms)
+ GET /app/livro/0a80a0a1-69a0-45cc-bf30-be20f3972c35 200 in 74ms (next.js: 9ms, application-code: 65ms)
+ GET /app/livro/0a80a0a1-69a0-45cc-bf30-be20f3972c35 200 in 80ms (next.js: 6ms, application-code: 74ms)
+ GET /app/livro/0a80a0a1-69a0-45cc-bf30-be20f3972c35 200 in 49ms (next.js: 8ms, application-code: 41ms)
+✓ Compiled in 293ms
+✓ Compiled in 83ms
+✓ Compiled in 153ms
+ GET /app/livro/0a80a0a1-69a0-45cc-bf30-be20f3972c35 200 in 40ms (next.js: 12ms, application-code: 28ms)
+✓ Compiled in 53ms
+ GET /app/livro/0a80a0a1-69a0-45cc-bf30-be20f3972c35 200 in 45ms (next.js: 14ms, application-code: 31ms)
+✓ Compiled in 35ms
+ GET /app/livro/0a80a0a1-69a0-45cc-bf30-be20f3972c35 200 in 40ms (next.js: 12ms, application-code: 28ms)
+ GET /app/livro/0a80a0a1-69a0-45cc-bf30-be20f3972c35 200 in 39ms (next.js: 12ms, application-code: 27ms)
+✓ Compiled in 43ms
+✓ Compiled in 78ms
+ GET /app/livro/0a80a0a1-69a0-45cc-bf30-be20f3972c35 200 in 56ms (next.js: 13ms, application-code: 43ms)
+[browser] ./src/app/app/livro/[bookId]/capitulo/[chapterId]/page.tsx:6:69
+Error: Expected ';', got 'no substitution template literal'
+  4 | ...o,useRef,useState } from "react"
+  5 | ...nnel } from "@supabase/supabase-js"
+> 6 | ...owserClient } from "@/lib/supabase-browser"`r`nimport OllamaStatus from "./OllamaStatus"...
+    |                                               ^^^
+  7 | ...uthor_id:string;content:string|null;message_type:"story"|"author_note";sequence_number:n...
+  8 | ...itle:string;chapter_number:number}
+  9 | ...hapterPage(){
+
+Parsing ecmascript source code failed
+
+Import traces:
+  Client Component Browser:
+    ./src/app/app/livro/[bookId]/capitulo/[chapterId]/page.tsx [Client Component Browser]
+    ./src/app/app/livro/[bookId]/capitulo/[chapterId]/page.tsx [Server Component]
+
+  Client Component SSR:
+    ./src/app/app/livro/[bookId]/capitulo/[chapterId]/page.tsx [Client Component SSR]
+    ./src/app/app/livro/[bookId]/capitulo/[chapterId]/page.tsx [Server Component] 
+[browser] ./src/app/app/livro/[bookId]/capitulo/[chapterId]/page.tsx:6:69
+Error: Expected ';', got 'no substitution template literal'
+  4 | ...o,useRef,useState } from "react"
+  5 | ...nnel } from "@supabase/supabase-js"
+> 6 | ...owserClient } from "@/lib/supabase-browser"`r`nimport OllamaStatus from "./OllamaStatus"...
+    |                                               ^^^
+  7 | ...uthor_id:string;content:string|null;message_type:"story"|"author_note";sequence_number:n...
+  8 | ...itle:string;chapter_number:number}
+  9 | ...hapterPage(){
+
+Parsing ecmascript source code failed
+
+Import traces:
+  Client Component Browser:
+    ./src/app/app/livro/[bookId]/capitulo/[chapterId]/page.tsx [Client Component Browser]
+    ./src/app/app/livro/[bookId]/capitulo/[chapterId]/page.tsx [Server Component]
+
+  Client Component SSR:
+    ./src/app/app/livro/[bookId]/capitulo/[chapterId]/page.tsx [Client Component SSR]
+    ./src/app/app/livro/[bookId]/capitulo/[chapterId]/page.tsx [Server Component] 
+ GET /app/livro/0a80a0a1-69a0-45cc-bf30-be20f3972c35 200 in 576ms (next.js: 13ms, application-code: 563ms)
+ GET /app/livro/0a80a0a1-69a0-45cc-bf30-be20f3972c35/capitulo/d7cdbdb4-07dd-48db-9bdc-5b3de4e64aff 200 in 116ms (next.js: 74ms, application-code: 42ms)
+ GET /app/livro/0a80a0a1-69a0-45cc-bf30-be20f3972c35/capitulo/d7cdbdb4-07dd-48db-9bdc-5b3de4e64aff 200 in 67ms (next.js: 11ms, application-code: 56ms)
+ GET /app/livro/0a80a0a1-69a0-45cc-bf30-be20f3972c35/capitulo/d7cdbdb4-07dd-48db-9bdc-5b3de4e64aff 200 in 420ms (next.js: 126ms, application-code: 293ms)
+ GET /app/livro/0a80a0a1-69a0-45cc-bf30-be20f3972c35/capitulo/d7cdbdb4-07dd-48db-9bdc-5b3de4e64aff 200 in 151ms (next.js: 30ms, application-code: 122ms)
+ GET /app/livro/0a80a0a1-69a0-45cc-bf30-be20f3972c35/capitulo/d7cdbdb4-07dd-48db-9bdc-5b3de4e64aff 200 in 103ms (next.js: 18ms, application-code: 85ms)
+✓ Compiled in 304ms
+ GET /app/livro/0a80a0a1-69a0-45cc-bf30-be20f3972c35/capitulo/d7cdbdb4-07dd-48db-9bdc-5b3de4e64aff 200 in 171ms (next.js: 35ms, application-code: 136ms)
+ GET /app/livro/0a80a0a1-69a0-45cc-bf30-be20f3972c35/capitulo/d7cdbdb4-07dd-48db-9bdc-5b3de4e64aff 200 in 60ms (next.js: 9ms, application-code: 51ms)
+ GET /app/livro/0a80a0a1-69a0-45cc-bf30-be20f3972c35/capitulo/d7cdbdb4-07dd-48db-9bdc-5b3de4e64aff 200 in 77ms (next.js: 12ms, application-code: 65ms)
+[browser] ./src/app/app/livro/[bookId]/capitulo/[chapterId]/OllamaStatus.tsx:16:85
+Error: Expected a semicolon
+  14 | ...
+  15 | ...
+> 16 | ...ge.getItem("inertia:ollama:model") ?? ""`r`n    const nextModel = storedModel || next.m...
+     |                                               ^
+  17 | ...
+  18 | ...
+  19 | ...
+
+Parsing ecmascript source code failed
+
+Import traces:
+  Client Component Browser:
+    ./src/app/app/livro/[bookId]/capitulo/[chapterId]/OllamaStatus.tsx [Client Component Browser]
+    ./src/app/app/livro/[bookId]/capitulo/[chapterId]/page.tsx [Client Component Browser]
+    ./src/app/app/livro/[bookId]/capitulo/[chapterId]/page.tsx [Server Component]
+
+  Client Component SSR:
+    ./src/app/app/livro/[bookId]/capitulo/[chapterId]/OllamaStatus.tsx [Client Component SSR]
+    ./src/app/app/livro/[bookId]/capitulo/[chapterId]/page.tsx [Client Component SSR]
+    ./src/app/app/livro/[bookId]/capitulo/[chapterId]/page.tsx [Server Component] 
+ GET /app/livro/0a80a0a1-69a0-45cc-bf30-be20f3972c35/capitulo/d7cdbdb4-07dd-48db-9bdc-5b3de4e64aff 200 in 297ms (next.js: 136ms, application-code: 160ms)
+ POST /api/ollama/compile 200 in 100s (next.js: 857ms, application-code: 99s)
+ GET /app/livro/0a80a0a1-69a0-45cc-bf30-be20f3972c35/capitulo/d7cdbdb4-07dd-48db-9bdc-5b3de4e64aff 200 in 143ms (next.js: 32ms, application-code: 111ms)
+ POST /api/ollama/compile 200 in 16.8s (next.js: 30ms, application-code: 16.8s)
+
+-----
+[1m[31mFATAL[39m[0m: An unexpected Turbopack error occurred. A panic log has been written to C:\Users\fid4\AppData\Local\Temp\next-panic-62f43af181e701e6cc16f0752b077611.log.
+
+To help make Turbopack better, report this error by clicking here: https://bugs.nextjs.org/search?category=turbopack-error-report&title=Turbopack%20Error%3A%20%5Bproject%5D%2Fsrc%2Fapp%2Fglobals.css%20%5Bapp-client%5D%20%28css%29&body=Turbopack%20version%3A%20%603d32eb87%60%0ANext.js%20version%3A%20%600.0.0%60%0A%0AError%20message%3A%0A%60%60%60%0A%5Bproject%5D%2Fsrc%2Fapp%2Fglobals.css%20%5Bapp-client%5D%20%28css%29%0A%0ACaused%20by%3A%0A-%20reading%20file%20%22%5C%5C%5C%5C%3F%5C%5CC%3A%5C%5CUsers%5C%5Cfid4%5C%5CProjetosPessoais%5C%5CInertia%5C%5Csrc%5C%5Capp%5C%5Capi%5C%5Collama%5C%5Chealth%5C%5Croute.ts%22%0A-%20O%20arquivo%20j%C3%A1%20est%C3%A1%20sendo%20usado%20por%20outro%20processo.%20%28os%20error%2032%29%0A%0ADebug%20info%3A%0A-%20Execution%20of%20subscribe_issues_and_diags_operation%20failed%0A-%20Execution%20of%20%3CAppEndpoint%20as%20Endpoint%3E%3A%3Aserver_changed%20failed%0A-%20Execution%20of%20%2AProject%3A%3Aserver_changed%20failed%0A-%20Execution%20of%20%2AAppEndpointOutput%3A%3Aserver_assets%20failed%0A-%20Execution%20of%20AppEndpoint%3A%3Aoutput%20failed%0A-%20Execution%20of%20AppProject%3A%3Aapp_module_graphs%20failed%0A-%20Execution%20of%20%2A%3CAppEndpoint%20as%20Endpoint%3E%3A%3Aadditional_entries%20failed%0A-%20Execution%20of%20ModuleGraph%3A%3Afrom_graphs%20failed%0A-%20Execution%20of%20ModuleGraph%3A%3Afrom_graphs_inner%20failed%0A-%20Execution%20of%20SingleModuleGraph%3A%3Anew_with_entries_visited_intern%20failed%0A-%20%5Bproject%5D%2Fsrc%2Fapp%2Fglobals.css%20%5Bapp-client%5D%20%28css%29%0A-%20Execution%20of%20primary_chunkable_referenced_modules%20failed%0A-%20Execution%20of%20%3CCssModule%20as%20Module%3E%3A%3Areferences%20failed%0A-%20Execution%20of%20parse_css%20failed%0A-%20Execution%20of%20%3CPostCssTransformedAsset%20as%20Asset%3E%3A%3Acontent%20failed%0A-%20Execution%20of%20PostCssTransformedAsset%3A%3Aprocess%20failed%0A-%20Execution%20of%20evaluate_webpack_loader%20failed%0A-%20Execution%20of%20track_glob%20failed%0A-%20Execution%20of%20track_glob_inner%20failed%0A-%20Execution%20of%20track_glob_inner%20failed%0A-%20Execution%20of%20track_glob_inner%20failed%0A-%20Execution%20of%20track_glob_inner%20failed%0A-%20Execution%20of%20%3CDiskFileSystem%20as%20FileSystem%3E%3A%3Aread%20failed%0A-%20reading%20file%20%22%5C%5C%5C%5C%3F%5C%5CC%3A%5C%5CUsers%5C%5Cfid4%5C%5CProjetosPessoais%5C%5CInertia%5C%5Csrc%5C%5Capp%5C%5Capi%5C%5Collama%5C%5Chealth%5C%5Croute.ts%22%0A-%20O%20arquivo%20j%C3%A1%20est%C3%A1%20sendo%20usado%20por%20outro%20processo.%20%28os%20error%2032%29%0A%60%60%60&labels=Turbopack,Turbopack%20Panic%20Backtrace
+-----
+
+✓ Compiled in 302ms
+ GET /app/livro/0a80a0a1-69a0-45cc-bf30-be20f3972c35/capitulo/d7cdbdb4-07dd-48db-9bdc-5b3de4e64aff 200 in 1042ms (next.js: 423ms, application-code: 619ms)
+ GET /app/livro/0a80a0a1-69a0-45cc-bf30-be20f3972c35/capitulo/d7cdbdb4-07dd-48db-9bdc-5b3de4e64aff 200 in 174ms (next.js: 20ms, application-code: 154ms)
+✓ Compiled in 129ms
+[browser] ./src/app/app/livro/[bookId]/capitulo/[chapterId]/EditorialPanel.tsx:24:114
+Error: Expected a semicolon
+  22 | ...
+  23 | ...
+> 24 | ...rogress, setCompileProgress] = useState(0)`n  const [compileStage, setCompileStage] = u...
+     |                                               ^
+  25 | ...
+  26 | ...
+  27 | ...
+
+Parsing ecmascript source code failed
+
+Import traces:
+  Client Component Browser:
+    ./src/app/app/livro/[bookId]/capitulo/[chapterId]/EditorialPanel.tsx [Client Component Browser]
+    ./src/app/app/livro/[bookId]/capitulo/[chapterId]/page.tsx [Client Component Browser]
+    ./src/app/app/livro/[bookId]/capitulo/[chapterId]/page.tsx [Server Component]
+
+  Client Component SSR:
+    ./src/app/app/livro/[bookId]/capitulo/[chapterId]/EditorialPanel.tsx [Client Component SSR]
+    ./src/app/app/livro/[bookId]/capitulo/[chapterId]/page.tsx [Client Component SSR]
+    ./src/app/app/livro/[bookId]/capitulo/[chapterId]/page.tsx [Server Component] 
+[browser] ./src/app/app/livro/[bookId]/capitulo/[chapterId]/EditorialPanel.tsx:24:114
+Error: Expected a semicolon
+  22 | ...
+  23 | ...
+> 24 | ...rogress, setCompileProgress] = useState(0)`n  const [compileStage, setCompileStage] = u...
+     |                                               ^
+  25 | ...
+  26 | ...
+  27 | ...
+
+Parsing ecmascript source code failed
+
+Import traces:
+  Client Component Browser:
+    ./src/app/app/livro/[bookId]/capitulo/[chapterId]/EditorialPanel.tsx [Client Component Browser]
+    ./src/app/app/livro/[bookId]/capitulo/[chapterId]/page.tsx [Client Component Browser]
+    ./src/app/app/livro/[bookId]/capitulo/[chapterId]/page.tsx [Server Component]
+
+  Client Component SSR:
+    ./src/app/app/livro/[bookId]/capitulo/[chapterId]/EditorialPanel.tsx [Client Component SSR]
+    ./src/app/app/livro/[bookId]/capitulo/[chapterId]/page.tsx [Client Component SSR]
+    ./src/app/app/livro/[bookId]/capitulo/[chapterId]/page.tsx [Server Component] 
+[browser] ./src/app/app/livro/[bookId]/capitulo/[chapterId]/EditorialPanel.tsx:69:42
+Error: Unknown regular expression flags.
+  67 | ...
+  68 | ... try {
+> 69 | ...   const healthResponse = await fetch(/api/ollama/health?model=, { cache: "no-store" })
+     |                                          ^^^^^^^^^^^
+  70 | ...   const healthData = await healthResponse.json().catch(() => ({}))
+  71 | ...   if (!healthResponse.ok || !healthData.ok) {
+  72 | ...     throw new Error(healthData.error ?? "Ollama nÃ£o estÃ¡ acessÃ­vel. Verifique se ele...
+
+Parsing ecmascript source code failed
+
+Import traces:
+  Client Component Browser:
+    ./src/app/app/livro/[bookId]/capitulo/[chapterId]/EditorialPanel.tsx [Client Component Browser]
+    ./src/app/app/livro/[bookId]/capitulo/[chapterId]/page.tsx [Client Component Browser]
+    ./src/app/app/livro/[bookId]/capitulo/[chapterId]/page.tsx [Server Component]
+
+  Client Component SSR:
+    ./src/app/app/livro/[bookId]/capitulo/[chapterId]/EditorialPanel.tsx [Client Component SSR]
+    ./src/app/app/livro/[bookId]/capitulo/[chapterId]/page.tsx [Client Component SSR]
+    ./src/app/app/livro/[bookId]/capitulo/[chapterId]/page.tsx [Server Component] 
+[browser] ./src/app/app/livro/[bookId]/capitulo/[chapterId]/EditorialPanel.tsx:24:114
+Error: Expected a semicolon
+  22 | ...
+  23 | ...
+> 24 | ...rogress, setCompileProgress] = useState(0)`n  const [compileStage, setCompileStage] = u...
+     |                                               ^
+  25 | ...
+  26 | ...
+  27 | ...
+
+Parsing ecmascript source code failed
+
+Import traces:
+  Client Component Browser:
+    ./src/app/app/livro/[bookId]/capitulo/[chapterId]/EditorialPanel.tsx [Client Component Browser]
+    ./src/app/app/livro/[bookId]/capitulo/[chapterId]/page.tsx [Client Component Browser]
+    ./src/app/app/livro/[bookId]/capitulo/[chapterId]/page.tsx [Server Component]
+
+  Client Component SSR:
+    ./src/app/app/livro/[bookId]/capitulo/[chapterId]/EditorialPanel.tsx [Client Component SSR]
+    ./src/app/app/livro/[bookId]/capitulo/[chapterId]/page.tsx [Client Component SSR]
+    ./src/app/app/livro/[bookId]/capitulo/[chapterId]/page.tsx [Server Component] 
+[browser] ./src/app/app/livro/[bookId]/capitulo/[chapterId]/EditorialPanel.tsx:69:42
+Error: Unknown regular expression flags.
+  67 | ...
+  68 | ... try {
+> 69 | ...   const healthResponse = await fetch(/api/ollama/health?model=, { cache: "no-store" })
+     |                                          ^^^^^^^^^^^
+  70 | ...   const healthData = await healthResponse.json().catch(() => ({}))
+  71 | ...   if (!healthResponse.ok || !healthData.ok) {
+  72 | ...     throw new Error(healthData.error ?? "Ollama nÃ£o estÃ¡ acessÃ­vel. Verifique se ele...
+
+Parsing ecmascript source code failed
+
+Import traces:
+  Client Component Browser:
+    ./src/app/app/livro/[bookId]/capitulo/[chapterId]/EditorialPanel.tsx [Client Component Browser]
+    ./src/app/app/livro/[bookId]/capitulo/[chapterId]/page.tsx [Client Component Browser]
+    ./src/app/app/livro/[bookId]/capitulo/[chapterId]/page.tsx [Server Component]
+
+  Client Component SSR:
+    ./src/app/app/livro/[bookId]/capitulo/[chapterId]/EditorialPanel.tsx [Client Component SSR]
+    ./src/app/app/livro/[bookId]/capitulo/[chapterId]/page.tsx [Client Component SSR]
+    ./src/app/app/livro/[bookId]/capitulo/[chapterId]/page.tsx [Server Component] 
+✓ Compiled in 39ms
+✓ Compiled in 431ms
+✓ Compiled in 42ms
+ GET /app/livro/0a80a0a1-69a0-45cc-bf30-be20f3972c35/capitulo/d7cdbdb4-07dd-48db-9bdc-5b3de4e64aff 200 in 211ms (next.js: 85ms, application-code: 126ms)
+ GET /app/livro/0a80a0a1-69a0-45cc-bf30-be20f3972c35/capitulo/d7cdbdb4-07dd-48db-9bdc-5b3de4e64aff 200 in 208ms (next.js: 165ms, application-code: 43ms)
+ GET /api/ollama/health?model=qwen3%3A4b 200 in 1489ms (next.js: 654ms, application-code: 835ms)
+ GET /api/ollama/health?model=qwen3%3A4b 200 in 1462ms (next.js: 549ms, application-code: 914ms)
+ GET /app/livro/0a80a0a1-69a0-45cc-bf30-be20f3972c35/capitulo/d7cdbdb4-07dd-48db-9bdc-5b3de4e64aff 200 in 51ms (next.js: 14ms, application-code: 37ms)
+ GET /app/livro/0a80a0a1-69a0-45cc-bf30-be20f3972c35/capitulo/d7cdbdb4-07dd-48db-9bdc-5b3de4e64aff 200 in 50ms (next.js: 9ms, application-code: 41ms)
+✓ Compiled in 45ms
+ GET /app/livro/0a80a0a1-69a0-45cc-bf30-be20f3972c35/capitulo/d7cdbdb4-07dd-48db-9bdc-5b3de4e64aff 200 in 53ms (next.js: 20ms, application-code: 33ms)
+⚠ Fast Refresh had to perform a full reload due to a runtime error.
+✓ Compiled in 95ms
+ GET /app/livro/0a80a0a1-69a0-45cc-bf30-be20f3972c35/capitulo/d7cdbdb4-07dd-48db-9bdc-5b3de4e64aff 200 in 107ms (next.js: 11ms, application-code: 96ms)
+ GET /api/ollama/health?model=qwen3%3A4b 200 in 337ms (next.js: 4ms, application-code: 333ms)
+✓ Compiled in 26ms
+ GET /app/livro/0a80a0a1-69a0-45cc-bf30-be20f3972c35/capitulo/d7cdbdb4-07dd-48db-9bdc-5b3de4e64aff 200 in 47ms (next.js: 17ms, application-code: 31ms)
+⚠ Fast Refresh had to perform a full reload due to a runtime error.
+✓ Compiled in 32ms
+ GET /app/livro/0a80a0a1-69a0-45cc-bf30-be20f3972c35/capitulo/d7cdbdb4-07dd-48db-9bdc-5b3de4e64aff 200 in 66ms (next.js: 12ms, application-code: 54ms)
+ GET /api/ollama/health?model=qwen3%3A4b 200 in 738ms (next.js: 4ms, application-code: 734ms)
+✓ Compiled in 1018ms
+ GET /app/livro/0a80a0a1-69a0-45cc-bf30-be20f3972c35/capitulo/d7cdbdb4-07dd-48db-9bdc-5b3de4e64aff 200 in 558ms (next.js: 533ms, application-code: 25ms)
+ GET /api/ollama/health?model=qwen3:4b 401 in 17ms (next.js: 7ms, application-code: 9ms)
+[browser] ./src/app/app/livro/[bookId]/capitulo/[chapterId]/EditorialPanel.tsx:24:114
+Error: Expected a semicolon
+  22 | ...
+  23 | ...
+> 24 | ...rogress, setCompileProgress] = useState(0)`n  const [compileStage, setCompileStage] = u...
+     |                                               ^
+  25 | ...
+  26 | ...
+  27 | ...
+
+Parsing ecmascript source code failed
+
+Import traces:
+  Client Component Browser:
+    ./src/app/app/livro/[bookId]/capitulo/[chapterId]/EditorialPanel.tsx [Client Component Browser]
+    ./src/app/app/livro/[bookId]/capitulo/[chapterId]/page.tsx [Client Component Browser]
+    ./src/app/app/livro/[bookId]/capitulo/[chapterId]/page.tsx [Server Component]
+
+  Client Component SSR:
+    ./src/app/app/livro/[bookId]/capitulo/[chapterId]/EditorialPanel.tsx [Client Component SSR]
+    ./src/app/app/livro/[bookId]/capitulo/[chapterId]/page.tsx [Client Component SSR]
+    ./src/app/app/livro/[bookId]/capitulo/[chapterId]/page.tsx [Server Component] 
+[browser] ./src/app/app/livro/[bookId]/capitulo/[chapterId]/EditorialPanel.tsx:24:114
+Error: Expected a semicolon
+  22 | ...
+  23 | ...
+> 24 | ...rogress, setCompileProgress] = useState(0)`n  const [compileStage, setCompileStage] = u...
+     |                                               ^
+  25 | ...
+  26 | ...
+  27 | ...
+
+Parsing ecmascript source code failed
+
+Import traces:
+  Client Component Browser:
+    ./src/app/app/livro/[bookId]/capitulo/[chapterId]/EditorialPanel.tsx [Client Component Browser]
+    ./src/app/app/livro/[bookId]/capitulo/[chapterId]/page.tsx [Client Component Browser]
+    ./src/app/app/livro/[bookId]/capitulo/[chapterId]/page.tsx [Server Component]
+
+  Client Component SSR:
+    ./src/app/app/livro/[bookId]/capitulo/[chapterId]/EditorialPanel.tsx [Client Component SSR]
+    ./src/app/app/livro/[bookId]/capitulo/[chapterId]/page.tsx [Client Component SSR]
+    ./src/app/app/livro/[bookId]/capitulo/[chapterId]/page.tsx [Server Component] 
+[browser] ./src/app/app/livro/[bookId]/capitulo/[chapterId]/EditorialPanel.tsx:69:42
+Error: Unknown regular expression flags.
+  67 | ...
+  68 | ... try {
+> 69 | ...   const healthResponse = await fetch(/api/ollama/health?model=, { cache: "no-store" })
+     |                                          ^^^^^^^^^^^
+  70 | ...   const healthData = await healthResponse.json().catch(() => ({}))
+  71 | ...   if (!healthResponse.ok || !healthData.ok) {
+  72 | ...     throw new Error(healthData.error ?? "Ollama nÃ£o estÃ¡ acessÃ­vel. Verifique se ele...
+
+Parsing ecmascript source code failed
+
+Import traces:
+  Client Component Browser:
+    ./src/app/app/livro/[bookId]/capitulo/[chapterId]/EditorialPanel.tsx [Client Component Browser]
+    ./src/app/app/livro/[bookId]/capitulo/[chapterId]/page.tsx [Client Component Browser]
+    ./src/app/app/livro/[bookId]/capitulo/[chapterId]/page.tsx [Server Component]
+
+  Client Component SSR:
+    ./src/app/app/livro/[bookId]/capitulo/[chapterId]/EditorialPanel.tsx [Client Component SSR]
+    ./src/app/app/livro/[bookId]/capitulo/[chapterId]/page.tsx [Client Component SSR]
+    ./src/app/app/livro/[bookId]/capitulo/[chapterId]/page.tsx [Server Component] 
+[browser] ./src/app/app/livro/[bookId]/capitulo/[chapterId]/EditorialPanel.tsx:24:114
+Error: Expected a semicolon
+  22 | ...
+  23 | ...
+> 24 | ...rogress, setCompileProgress] = useState(0)`n  const [compileStage, setCompileStage] = u...
+     |                                               ^
+  25 | ...
+  26 | ...
+  27 | ...
+
+Parsing ecmascript source code failed
+
+Import traces:
+  Client Component Browser:
+    ./src/app/app/livro/[bookId]/capitulo/[chapterId]/EditorialPanel.tsx [Client Component Browser]
+    ./src/app/app/livro/[bookId]/capitulo/[chapterId]/page.tsx [Client Component Browser]
+    ./src/app/app/livro/[bookId]/capitulo/[chapterId]/page.tsx [Server Component]
+
+  Client Component SSR:
+    ./src/app/app/livro/[bookId]/capitulo/[chapterId]/EditorialPanel.tsx [Client Component SSR]
+    ./src/app/app/livro/[bookId]/capitulo/[chapterId]/page.tsx [Client Component SSR]
+    ./src/app/app/livro/[bookId]/capitulo/[chapterId]/page.tsx [Server Component] 
+[browser] ./src/app/app/livro/[bookId]/capitulo/[chapterId]/EditorialPanel.tsx:69:42
+Error: Unknown regular expression flags.
+  67 | ...
+  68 | ... try {
+> 69 | ...   const healthResponse = await fetch(/api/ollama/health?model=, { cache: "no-store" })
+     |                                          ^^^^^^^^^^^
+  70 | ...   const healthData = await healthResponse.json().catch(() => ({}))
+  71 | ...   if (!healthResponse.ok || !healthData.ok) {
+  72 | ...     throw new Error(healthData.error ?? "Ollama nÃ£o estÃ¡ acessÃ­vel. Verifique se ele...
+
+Parsing ecmascript source code failed
+
+Import traces:
+  Client Component Browser:
+    ./src/app/app/livro/[bookId]/capitulo/[chapterId]/EditorialPanel.tsx [Client Component Browser]
+    ./src/app/app/livro/[bookId]/capitulo/[chapterId]/page.tsx [Client Component Browser]
+    ./src/app/app/livro/[bookId]/capitulo/[chapterId]/page.tsx [Server Component]
+
+  Client Component SSR:
+    ./src/app/app/livro/[bookId]/capitulo/[chapterId]/EditorialPanel.tsx [Client Component SSR]
+    ./src/app/app/livro/[bookId]/capitulo/[chapterId]/page.tsx [Client Component SSR]
+    ./src/app/app/livro/[bookId]/capitulo/[chapterId]/page.tsx [Server Component] 
+[browser] ./src/app/app/livro/[bookId]/capitulo/[chapterId]/EditorialPanel.tsx:24:114
+Error: Expected a semicolon
+  22 | ...
+  23 | ...
+> 24 | ...rogress, setCompileProgress] = useState(0)`n  const [compileStage, setCompileStage] = u...
+     |                                               ^
+  25 | ...
+  26 | ...
+  27 | ...
+
+Parsing ecmascript source code failed
+
+Import traces:
+  Client Component Browser:
+    ./src/app/app/livro/[bookId]/capitulo/[chapterId]/EditorialPanel.tsx [Client Component Browser]
+    ./src/app/app/livro/[bookId]/capitulo/[chapterId]/page.tsx [Client Component Browser]
+    ./src/app/app/livro/[bookId]/capitulo/[chapterId]/page.tsx [Server Component]
+
+  Client Component SSR:
+    ./src/app/app/livro/[bookId]/capitulo/[chapterId]/EditorialPanel.tsx [Client Component SSR]
+    ./src/app/app/livro/[bookId]/capitulo/[chapterId]/page.tsx [Client Component SSR]
+    ./src/app/app/livro/[bookId]/capitulo/[chapterId]/page.tsx [Server Component] 
+[browser] ./src/app/app/livro/[bookId]/capitulo/[chapterId]/OllamaStatus.tsx:18:35
+Error: Expression expected
+  16 |     try {
+  17 |       const storedModel = window.localStorage.getItem("inertia:ollama:model") ?? ""
+> 18 |       const query = storedModel ? ?model= : ""
+     |                                   ^
+  19 |       const response = await fetch(/api/ollama/health, { cache: "no-store" })
+  20 |       const data = await response.json().catch(() => ({})) as { ok?: boolean; models?: str...
+  21 |       const models: OllamaModel[] = (data.models ?? []).map((name) => ({ name }))
+
+Parsing ecmascript source code failed
+
+Import traces:
+  Client Component Browser:
+    ./src/app/app/livro/[bookId]/capitulo/[chapterId]/OllamaStatus.tsx [Client Component Browser]
+    ./src/app/app/livro/[bookId]/capitulo/[chapterId]/page.tsx [Client Component Browser]
+    ./src/app/app/livro/[bookId]/capitulo/[chapterId]/page.tsx [Server Component]
+
+  Client Component SSR:
+    ./src/app/app/livro/[bookId]/capitulo/[chapterId]/OllamaStatus.tsx [Client Component SSR]
+    ./src/app/app/livro/[bookId]/capitulo/[chapterId]/page.tsx [Client Component SSR]
+    ./src/app/app/livro/[bookId]/capitulo/[chapterId]/page.tsx [Server Component] 
+[browser] ./src/app/app/livro/[bookId]/capitulo/[chapterId]/EditorialPanel.tsx:69:42
+Error: Unknown regular expression flags.
+  67 | ...
+  68 | ... try {
+> 69 | ...   const healthResponse = await fetch(/api/ollama/health?model=, { cache: "no-store" })
+     |                                          ^^^^^^^^^^^
+  70 | ...   const healthData = await healthResponse.json().catch(() => ({}))
+  71 | ...   if (!healthResponse.ok || !healthData.ok) {
+  72 | ...     throw new Error(healthData.error ?? "Ollama nÃ£o estÃ¡ acessÃ­vel. Verifique se ele...
+
+Parsing ecmascript source code failed
+
+Import traces:
+  Client Component Browser:
+    ./src/app/app/livro/[bookId]/capitulo/[chapterId]/EditorialPanel.tsx [Client Component Browser]
+    ./src/app/app/livro/[bookId]/capitulo/[chapterId]/page.tsx [Client Component Browser]
+    ./src/app/app/livro/[bookId]/capitulo/[chapterId]/page.tsx [Server Component]
+
+  Client Component SSR:
+    ./src/app/app/livro/[bookId]/capitulo/[chapterId]/EditorialPanel.tsx [Client Component SSR]
+    ./src/app/app/livro/[bookId]/capitulo/[chapterId]/page.tsx [Client Component SSR]
+    ./src/app/app/livro/[bookId]/capitulo/[chapterId]/page.tsx [Server Component] 
+[browser] ./src/app/app/livro/[bookId]/capitulo/[chapterId]/EditorialPanel.tsx:132:245
+Error: Expected a semicolon
+  130 | ...
+  131 | ...
+> 132 | ...", idle: "" } as const)[compileStage]  return <section className="border-b border-[#d5...
+      |                                           ^^^^^^
+  133 | ...nt-semibold text-[#253126]">Fonte e Manuscrito</h2></div><div className="flex gap-1 ro...
+  134 | ...
+  135 | ...e="progressbar" aria-valuemin={0} aria-valuemax={100} aria-valuenow={compileProgress}>...
+
+Parsing ecmascript source code failed
+
+Import traces:
+  Client Component Browser:
+    ./src/app/app/livro/[bookId]/capitulo/[chapterId]/EditorialPanel.tsx [Client Component Browser]
+    ./src/app/app/livro/[bookId]/capitulo/[chapterId]/page.tsx [Client Component Browser]
+    ./src/app/app/livro/[bookId]/capitulo/[chapterId]/page.tsx [Server Component]
+
+  Client Component SSR:
+    ./src/app/app/livro/[bookId]/capitulo/[chapterId]/EditorialPanel.tsx [Client Component SSR]
+    ./src/app/app/livro/[bookId]/capitulo/[chapterId]/page.tsx [Client Component SSR]
+    ./src/app/app/livro/[bookId]/capitulo/[chapterId]/page.tsx [Server Component] 
+[browser] ./src/app/app/livro/[bookId]/capitulo/[chapterId]/EditorialPanel.tsx:137:3
+Error: Expression expected
+  135 |     {compiling && <div className="mt-3 rounded-lg border border-[#d5c9bd] bg-[#f7f2ea] px...
+  136 |     {ollamaCheck && !compiling && <p className="mt-2 text-xs text-[#36552d]">{ollamaCheck...
+> 137 |   </section>
+      |   ^
+  138 | }
+  139 |
+
+Parsing ecmascript source code failed
+
+Import traces:
+  Client Component Browser:
+    ./src/app/app/livro/[bookId]/capitulo/[chapterId]/EditorialPanel.tsx [Client Component Browser]
+    ./src/app/app/livro/[bookId]/capitulo/[chapterId]/page.tsx [Client Component Browser]
+    ./src/app/app/livro/[bookId]/capitulo/[chapterId]/page.tsx [Server Component]
+
+  Client Component SSR:
+    ./src/app/app/livro/[bookId]/capitulo/[chapterId]/EditorialPanel.tsx [Client Component SSR]
+    ./src/app/app/livro/[bookId]/capitulo/[chapterId]/page.tsx [Client Component SSR]
+    ./src/app/app/livro/[bookId]/capitulo/[chapterId]/page.tsx [Server Component] 
+[browser] ./src/app/app/livro/[bookId]/capitulo/[chapterId]/EditorialPanel.tsx:137:4
+Error: Unterminated regexp literal
+  135 |     {compiling && <div className="mt-3 rounded-lg border border-[#d5c9bd] bg-[#f7f2ea] px...
+  136 |     {ollamaCheck && !compiling && <p className="mt-2 text-xs text-[#36552d]">{ollamaCheck...
+> 137 |   </section>
+      |    ^^^^^^^^^
+  138 | }
+  139 |
+
+Parsing ecmascript source code failed
+
+Import traces:
+  Client Component Browser:
+    ./src/app/app/livro/[bookId]/capitulo/[chapterId]/EditorialPanel.tsx [Client Component Browser]
+    ./src/app/app/livro/[bookId]/capitulo/[chapterId]/page.tsx [Client Component Browser]
+    ./src/app/app/livro/[bookId]/capitulo/[chapterId]/page.tsx [Server Component]
+
+  Client Component SSR:
+    ./src/app/app/livro/[bookId]/capitulo/[chapterId]/EditorialPanel.tsx [Client Component SSR]
+    ./src/app/app/livro/[bookId]/capitulo/[chapterId]/page.tsx [Client Component SSR]
+    ./src/app/app/livro/[bookId]/capitulo/[chapterId]/page.tsx [Server Component] 
+ GET /app/livro/0a80a0a1-69a0-45cc-bf30-be20f3972c35/capitulo/d7cdbdb4-07dd-48db-9bdc-5b3de4e64aff 200 in 71ms (next.js: 16ms, application-code: 55ms)
+ GET /api/ollama/health?model=qwen3%3A4b 200 in 267ms (next.js: 5ms, application-code: 262ms)
+ GET /api/ollama/health?model=qwen3%3A4b 200 in 322ms (next.js: 5ms, application-code: 318ms)
+ GET /api/ollama/health?model=qwen3%3A4b 200 in 248ms (next.js: 7ms, application-code: 241ms)
+ POST /api/ollama/compile 504 in 3.0min (next.js: 46ms, application-code: 3.0min)
+ GET /app/livro/0a80a0a1-69a0-45cc-bf30-be20f3972c35/capitulo/d7cdbdb4-07dd-48db-9bdc-5b3de4e64aff 200 in 506ms (next.js: 191ms, application-code: 315ms)
+ GET /app/livro/0a80a0a1-69a0-45cc-bf30-be20f3972c35/capitulo/d7cdbdb4-07dd-48db-9bdc-5b3de4e64aff 200 in 463ms (next.js: 402ms, application-code: 62ms)
+ GET /app/livro/0a80a0a1-69a0-45cc-bf30-be20f3972c35/capitulo/d7cdbdb4-07dd-48db-9bdc-5b3de4e64aff 200 in 663ms (next.js: 169ms, application-code: 494ms)
+✓ Compiled in 270ms
+✓ Compiled in 79ms
+⚠ Fast Refresh had to perform a full reload due to a runtime error.
+ GET /app/livro/0a80a0a1-69a0-45cc-bf30-be20f3972c35/capitulo/d7cdbdb4-07dd-48db-9bdc-5b3de4e64aff 200 in 890ms (next.js: 185ms, application-code: 706ms)
+ GET /app/livro/0a80a0a1-69a0-45cc-bf30-be20f3972c35/capitulo/d7cdbdb4-07dd-48db-9bdc-5b3de4e64aff 200 in 350ms (next.js: 16ms, application-code: 334ms)
+ GET /api/ollama/health?model=qwen3%3A4b 200 in 565ms (next.js: 35ms, application-code: 530ms)
+ GET /api/ollama/health?model=qwen3%3A4b 200 in 708ms (next.js: 31ms, application-code: 677ms)
+✓ Compiled in 103ms
+[browser] Uncaught Error: Element type is invalid: expected a string (for built-in components) or a class/function (for composite components) but got: object. You likely forgot to export your component from the file it's defined in, or you might have mixed up default and named imports.
+
+Check the render method of `ChapterPage`.
+    at Set.forEach (<anonymous>)
+    at ChapterPage (src/lib/supabase-browser.ts:3:155)
+  1 | 'use client'
+  2 | import { createBrowserClient } from '@supabase/ssr'
+> 3 | export function createSupabaseBrowserClient(){return createBrowserClient(process.env.NEXT_PUBLIC_SUPABASE_URL!,process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!)}
+    |                                                                                                                                                           ^
+  4 |
+  5 |
+✓ Compiled in 62ms
+⚠ Fast Refresh had to perform a full reload due to a runtime error.
+ GET /app/livro/0a80a0a1-69a0-45cc-bf30-be20f3972c35/capitulo/d7cdbdb4-07dd-48db-9bdc-5b3de4e64aff 200 in 151ms (next.js: 63ms, application-code: 88ms)
+ GET /api/ollama/health?model=qwen3%3A4b 200 in 739ms (next.js: 5ms, application-code: 733ms)
+✓ Compiled in 17ms
+ GET /app/livro/0a80a0a1-69a0-45cc-bf30-be20f3972c35/capitulo/d7cdbdb4-07dd-48db-9bdc-5b3de4e64aff 200 in 51ms (next.js: 17ms, application-code: 34ms)
+[browser] Uncaught Error: Element type is invalid: expected a string (for built-in components) or a class/function (for composite components) but got: object. You likely forgot to export your component from the file it's defined in, or you might have mixed up default and named imports.
+
+Check the render method of `ChapterPage`.
+    at ChapterPage (src/app/app/livro/[bookId]/capitulo/[chapterId]/page.tsx:34:3238)
+  32 | ...
+  33 | ...
+> 34 | ...8b887f] transition hover:bg-black/5 hover:text-[#55704f]">↶</button>:<span className="flex items-center gap-1"><button type="button" title="Editar esta mensagem" aria-label="Editar esta mensagem" onClick={()=>{setEditingId(m.id...
+     |                                                                                                                   ^
+  35 | ...
+  36 | ...
+  37 | ...
+⚠ Fast Refresh had to perform a full reload due to a runtime error.
+✓ Compiled in 22ms
+ GET /app/livro/0a80a0a1-69a0-45cc-bf30-be20f3972c35/capitulo/d7cdbdb4-07dd-48db-9bdc-5b3de4e64aff 200 in 110ms (next.js: 14ms, application-code: 96ms)
+ GET /api/ollama/health?model=qwen3%3A4b 200 in 280ms (next.js: 4ms, application-code: 276ms)
+ GET /app/livro/0a80a0a1-69a0-45cc-bf30-be20f3972c35/capitulo/d7cdbdb4-07dd-48db-9bdc-5b3de4e64aff 200 in 50ms (next.js: 13ms, application-code: 37ms)
+ GET /app/livro/0a80a0a1-69a0-45cc-bf30-be20f3972c35/capitulo/d7cdbdb4-07dd-48db-9bdc-5b3de4e64aff 200 in 42ms (next.js: 8ms, application-code: 34ms)
+ GET /app/livro/0a80a0a1-69a0-45cc-bf30-be20f3972c35/capitulo/d7cdbdb4-07dd-48db-9bdc-5b3de4e64aff 200 in 81ms (next.js: 16ms, application-code: 65ms)
+ GET /api/ollama/health?model=qwen3%3A4b 200 in 729ms (next.js: 6ms, application-code: 723ms)
+ GET /api/ollama/health?model=qwen3%3A4b 200 in 293ms (next.js: 4ms, application-code: 289ms)
+ GET /api/ollama/health?model=qwen3%3A4b-instruct 200 in 301ms (next.js: 4ms, application-code: 297ms)
+ GET /api/ollama/health?model=qwen3%3A4b-instruct 200 in 240ms (next.js: 5ms, application-code: 235ms)
+ POST /api/ollama/compile 200 in 15.7s (next.js: 8ms, application-code: 15.7s)
+ POST /api/ollama/review 200 in 16.5s (next.js: 385ms, application-code: 16.1s)
+ GET /api/ollama/health?model=qwen3%3A4b-instruct 200 in 615ms (next.js: 16ms, application-code: 599ms)
+ POST /api/ollama/compile 200 in 10.7s (next.js: 22ms, application-code: 10.7s)
+ POST /api/ollama/review 200 in 16.0s (next.js: 15ms, application-code: 16.0s)
+✓ Compiled in 271ms
+ GET /app/livro/0a80a0a1-69a0-45cc-bf30-be20f3972c35/capitulo/d7cdbdb4-07dd-48db-9bdc-5b3de4e64aff 200 in 143ms (next.js: 42ms, application-code: 101ms)
+ GET /app/livro/0a80a0a1-69a0-45cc-bf30-be20f3972c35/capitulo/d7cdbdb4-07dd-48db-9bdc-5b3de4e64aff 200 in 58ms (next.js: 15ms, application-code: 43ms)
+ GET /app/livro/0a80a0a1-69a0-45cc-bf30-be20f3972c35/capitulo/d7cdbdb4-07dd-48db-9bdc-5b3de4e64aff 200 in 55ms (next.js: 17ms, application-code: 38ms)
+ GET /app/livro/0a80a0a1-69a0-45cc-bf30-be20f3972c35/capitulo/d7cdbdb4-07dd-48db-9bdc-5b3de4e64aff 200 in 48ms (next.js: 14ms, application-code: 35ms)
+ GET /app/livro/0a80a0a1-69a0-45cc-bf30-be20f3972c35/capitulo/d7cdbdb4-07dd-48db-9bdc-5b3de4e64aff 200 in 39ms (next.js: 7ms, application-code: 32ms)
+ GET /app/livro/0a80a0a1-69a0-45cc-bf30-be20f3972c35 200 in 659ms (next.js: 529ms, application-code: 130ms)
+✓ Compiled in 52ms
+✓ Compiled in 35ms
+ GET /app/livro/0a80a0a1-69a0-45cc-bf30-be20f3972c35 200 in 47ms (next.js: 12ms, application-code: 35ms)
+✓ Compiled in 61ms
+✓ Compiled in 36ms
+✓ Compiled in 34ms
+✓ Compiled in 29ms
+✓ Compiled in 45ms
+✓ Compiled in 22ms
+✓ Compiled in 24ms
+✓ Compiled in 35ms
+ GET /app/livro/0a80a0a1-69a0-45cc-bf30-be20f3972c35 200 in 44ms (next.js: 12ms, application-code: 32ms)
+✓ Compiled in 28ms
+ GET /app/livro/0a80a0a1-69a0-45cc-bf30-be20f3972c35 200 in 50ms (next.js: 17ms, application-code: 33ms)
+ GET /app/livro/0a80a0a1-69a0-45cc-bf30-be20f3972c35 200 in 41ms (next.js: 8ms, application-code: 33ms)
+✓ Compiled in 48ms
+[browser] ./src/app/app/livro/[bookId]/capitulo/[chapterId]/EditorialPanel.tsx:5:1
+Error: Export WattpadPreview doesn't exist in target module
+  3 | import { useCallback, useEffect, useMemo, useState } from "react"
+  4 | import { createSupabaseBrowserClient } from "@/lib/supabase-browser"
+> 5 | import { WattpadPreview } from "@/lib/wattpad-markdown"
+    | ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  6 |
+  7 | type SourceMessage = { id: string; content: string | null; message_type: "story" | "author_...
+  8 | type Manuscript = { id: string; content: string; updated_at: string }
+
+The export WattpadPreview was not found in module [project]/src/lib/wattpad-markdown.tsx [app-client] (ecmascript).
+The module has no exports at all.
+All exports of the module are statically known (It doesn't have dynamic exports). So it's known statically that the requested export doesn't exist.
+
+Import traces:
+  Client Component Browser:
+    ./src/app/app/livro/[bookId]/capitulo/[chapterId]/EditorialPanel.tsx [Client Component Browser]
+    ./src/app/app/livro/[bookId]/capitulo/[chapterId]/page.tsx [Client Component Browser]
+    ./src/app/app/livro/[bookId]/capitulo/[chapterId]/page.tsx [Server Component]
+
+  Client Component SSR:
+    ./src/app/app/livro/[bookId]/capitulo/[chapterId]/EditorialPanel.tsx [Client Component SSR]
+    ./src/app/app/livro/[bookId]/capitulo/[chapterId]/page.tsx [Client Component SSR]
+    ./src/app/app/livro/[bookId]/capitulo/[chapterId]/page.tsx [Server Component] 
+[browser] ./src/app/app/livro/[bookId]/capitulo/[chapterId]/EditorialPanel.tsx:5:1
+Error: Export WattpadPreview doesn't exist in target module
+  3 | import { useCallback, useEffect, useMemo, useState } from "react"
+  4 | import { createSupabaseBrowserClient } from "@/lib/supabase-browser"
+> 5 | import { WattpadPreview } from "@/lib/wattpad-markdown"
+    | ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  6 |
+  7 | type SourceMessage = { id: string; content: string | null; message_type: "story" | "author_...
+  8 | type Manuscript = { id: string; content: string; updated_at: string }
+
+The export WattpadPreview was not found in module [project]/src/lib/wattpad-markdown.tsx [app-ssr] (ecmascript).
+The module has no exports at all.
+All exports of the module are statically known (It doesn't have dynamic exports). So it's known statically that the requested export doesn't exist.
+
+Import traces:
+  Client Component Browser:
+    ./src/app/app/livro/[bookId]/capitulo/[chapterId]/EditorialPanel.tsx [Client Component Browser]
+    ./src/app/app/livro/[bookId]/capitulo/[chapterId]/page.tsx [Client Component Browser]
+    ./src/app/app/livro/[bookId]/capitulo/[chapterId]/page.tsx [Server Component]
+
+  Client Component SSR:
+    ./src/app/app/livro/[bookId]/capitulo/[chapterId]/EditorialPanel.tsx [Client Component SSR]
+    ./src/app/app/livro/[bookId]/capitulo/[chapterId]/page.tsx [Client Component SSR]
+    ./src/app/app/livro/[bookId]/capitulo/[chapterId]/page.tsx [Server Component] 
+[browser] ./src/app/app/livro/[bookId]/capitulo/[chapterId]/page.tsx:8:46
+Error: Expected ';', got 'no substitution template literal'
+   6 | ...ort { createSupabaseBrowserClient } from "@/lib/supabase-browser"
+   7 | ...ort OllamaStatus from "./OllamaStatus"
+>  8 | ...ort EditorialPanel from "./EditorialPanel"`r`nimport { WattpadMessage } from "@/lib/wat...
+     |                                              ^^^
+   9 | ...e Message={id:string;author_id:string;content:string|null;message_type:"story"|"author_...
+  10 | ...e Chapter={id:string;title:string;chapter_number:number}
+  11 | ...ort default function ChapterPage(){
+
+Parsing ecmascript source code failed
+
+Import traces:
+  Client Component Browser:
+    ./src/app/app/livro/[bookId]/capitulo/[chapterId]/page.tsx [Client Component Browser]
+    ./src/app/app/livro/[bookId]/capitulo/[chapterId]/page.tsx [Server Component]
+
+  Client Component SSR:
+    ./src/app/app/livro/[bookId]/capitulo/[chapterId]/page.tsx [Client Component SSR]
+    ./src/app/app/livro/[bookId]/capitulo/[chapterId]/page.tsx [Server Component] 
+[browser] ./src/app/app/livro/[bookId]/capitulo/[chapterId]/page.tsx:8:46
+Error: Expected ';', got 'no substitution template literal'
+   6 | ...ort { createSupabaseBrowserClient } from "@/lib/supabase-browser"
+   7 | ...ort OllamaStatus from "./OllamaStatus"
+>  8 | ...ort EditorialPanel from "./EditorialPanel"`r`nimport { WattpadMessage } from "@/lib/wat...
+     |                                              ^^^
+   9 | ...e Message={id:string;author_id:string;content:string|null;message_type:"story"|"author_...
+  10 | ...e Chapter={id:string;title:string;chapter_number:number}
+  11 | ...ort default function ChapterPage(){
+
+Parsing ecmascript source code failed
+
+Import traces:
+  Client Component Browser:
+    ./src/app/app/livro/[bookId]/capitulo/[chapterId]/page.tsx [Client Component Browser]
+    ./src/app/app/livro/[bookId]/capitulo/[chapterId]/page.tsx [Server Component]
+
+  Client Component SSR:
+    ./src/app/app/livro/[bookId]/capitulo/[chapterId]/page.tsx [Client Component SSR]
+    ./src/app/app/livro/[bookId]/capitulo/[chapterId]/page.tsx [Server Component] 
+[browser] ./src/app/app/livro/[bookId]/capitulo/[chapterId]/page.tsx:8:46
+Error: Expected ';', got 'no substitution template literal'
+   6 | ...ort { createSupabaseBrowserClient } from "@/lib/supabase-browser"
+   7 | ...ort OllamaStatus from "./OllamaStatus"
+>  8 | ...ort EditorialPanel from "./EditorialPanel"`r`nimport { WattpadMessage } from "@/lib/wat...
+     |                                              ^^^
+   9 | ...e Message={id:string;author_id:string;content:string|null;message_type:"story"|"author_...
+  10 | ...e Chapter={id:string;title:string;chapter_number:number}
+  11 | ...ort default function ChapterPage(){
+
+Parsing ecmascript source code failed
+
+Import traces:
+  Client Component Browser:
+    ./src/app/app/livro/[bookId]/capitulo/[chapterId]/page.tsx [Client Component Browser]
+    ./src/app/app/livro/[bookId]/capitulo/[chapterId]/page.tsx [Server Component]
+
+  Client Component SSR:
+    ./src/app/app/livro/[bookId]/capitulo/[chapterId]/page.tsx [Client Component SSR]
+    ./src/app/app/livro/[bookId]/capitulo/[chapterId]/page.tsx [Server Component] 
+[browser] ./src/app/app/livro/[bookId]/capitulo/[chapterId]/page.tsx:8:46
+Error: Expected ';', got 'no substitution template literal'
+   6 | ...ort { createSupabaseBrowserClient } from "@/lib/supabase-browser"
+   7 | ...ort OllamaStatus from "./OllamaStatus"
+>  8 | ...ort EditorialPanel from "./EditorialPanel"`r`nimport { WattpadMessage } from "@/lib/wat...
+     |                                              ^^^
+   9 | ...e Message={id:string;author_id:string;content:string|null;message_type:"story"|"author_...
+  10 | ...e Chapter={id:string;title:string;chapter_number:number}
+  11 | ...ort default function ChapterPage(){
+
+Parsing ecmascript source code failed
+
+Import traces:
+  Client Component Browser:
+    ./src/app/app/livro/[bookId]/capitulo/[chapterId]/page.tsx [Client Component Browser]
+    ./src/app/app/livro/[bookId]/capitulo/[chapterId]/page.tsx [Server Component]
+
+  Client Component SSR:
+    ./src/app/app/livro/[bookId]/capitulo/[chapterId]/page.tsx [Client Component SSR]
+    ./src/app/app/livro/[bookId]/capitulo/[chapterId]/page.tsx [Server Component] 
+[browser] ./src/app/app/livro/[bookId]/capitulo/[chapterId]/page.tsx:8:46
+Error: Expected ';', got 'no substitution template literal'
+   6 | ...ort { createSupabaseBrowserClient } from "@/lib/supabase-browser"
+   7 | ...ort OllamaStatus from "./OllamaStatus"
+>  8 | ...ort EditorialPanel from "./EditorialPanel"`r`nimport { WattpadMessage } from "@/lib/wat...
+     |                                              ^^^
+   9 | ...e Message={id:string;author_id:string;content:string|null;message_type:"story"|"author_...
+  10 | ...e Chapter={id:string;title:string;chapter_number:number}
+  11 | ...ort default function ChapterPage(){
+
+Parsing ecmascript source code failed
+
+Import traces:
+  Client Component Browser:
+    ./src/app/app/livro/[bookId]/capitulo/[chapterId]/page.tsx [Client Component Browser]
+    ./src/app/app/livro/[bookId]/capitulo/[chapterId]/page.tsx [Server Component]
+
+  Client Component SSR:
+    ./src/app/app/livro/[bookId]/capitulo/[chapterId]/page.tsx [Client Component SSR]
+    ./src/app/app/livro/[bookId]/capitulo/[chapterId]/page.tsx [Server Component] 
+[browser] ./src/app/app/livro/[bookId]/capitulo/[chapterId]/page.tsx:8:46
+Error: Expected ';', got 'no substitution template literal'
+   6 | ...ort { createSupabaseBrowserClient } from "@/lib/supabase-browser"
+   7 | ...ort OllamaStatus from "./OllamaStatus"
+>  8 | ...ort EditorialPanel from "./EditorialPanel"`r`nimport { WattpadMessage } from "@/lib/wat...
+     |                                              ^^^
+   9 | ...e Message={id:string;author_id:string;content:string|null;message_type:"story"|"author_...
+  10 | ...e Chapter={id:string;title:string;chapter_number:number}
+  11 | ...ort default function ChapterPage(){
+
+Parsing ecmascript source code failed
+
+Import traces:
+  Client Component Browser:
+    ./src/app/app/livro/[bookId]/capitulo/[chapterId]/page.tsx [Client Component Browser]
+    ./src/app/app/livro/[bookId]/capitulo/[chapterId]/page.tsx [Server Component]
+
+  Client Component SSR:
+    ./src/app/app/livro/[bookId]/capitulo/[chapterId]/page.tsx [Client Component SSR]
+    ./src/app/app/livro/[bookId]/capitulo/[chapterId]/page.tsx [Server Component] 
+[browser] ./src/app/app/livro/[bookId]/capitulo/[chapterId]/page.tsx:8:46
+Error: Expected ';', got 'no substitution template literal'
+   6 | ...ort { createSupabaseBrowserClient } from "@/lib/supabase-browser"
+   7 | ...ort OllamaStatus from "./OllamaStatus"
+>  8 | ...ort EditorialPanel from "./EditorialPanel"`r`nimport { WattpadMessage } from "@/lib/wat...
+     |                                              ^^^
+   9 | ...e Message={id:string;author_id:string;content:string|null;message_type:"story"|"author_...
+  10 | ...e Chapter={id:string;title:string;chapter_number:number}
+  11 | ...ort default function ChapterPage(){
+
+Parsing ecmascript source code failed
+
+Import traces:
+  Client Component Browser:
+    ./src/app/app/livro/[bookId]/capitulo/[chapterId]/page.tsx [Client Component Browser]
+    ./src/app/app/livro/[bookId]/capitulo/[chapterId]/page.tsx [Server Component]
+
+  Client Component SSR:
+    ./src/app/app/livro/[bookId]/capitulo/[chapterId]/page.tsx [Client Component SSR]
+    ./src/app/app/livro/[bookId]/capitulo/[chapterId]/page.tsx [Server Component] 
+[browser] ./src/app/app/livro/[bookId]/capitulo/[chapterId]/page.tsx:8:46
+Error: Expected ';', got 'no substitution template literal'
+   6 | ...ort { createSupabaseBrowserClient } from "@/lib/supabase-browser"
+   7 | ...ort OllamaStatus from "./OllamaStatus"
+>  8 | ...ort EditorialPanel from "./EditorialPanel"`r`nimport { WattpadMessage } from "@/lib/wat...
+     |                                              ^^^
+   9 | ...e Message={id:string;author_id:string;content:string|null;message_type:"story"|"author_...
+  10 | ...e Chapter={id:string;title:string;chapter_number:number}
+  11 | ...ort default function ChapterPage(){
+
+Parsing ecmascript source code failed
+
+Import traces:
+  Client Component Browser:
+    ./src/app/app/livro/[bookId]/capitulo/[chapterId]/page.tsx [Client Component Browser]
+    ./src/app/app/livro/[bookId]/capitulo/[chapterId]/page.tsx [Server Component]
+
+  Client Component SSR:
+    ./src/app/app/livro/[bookId]/capitulo/[chapterId]/page.tsx [Client Component SSR]
+    ./src/app/app/livro/[bookId]/capitulo/[chapterId]/page.tsx [Server Component] 
+[browser] ./src/app/app/livro/[bookId]/capitulo/[chapterId]/EditorialPanel.tsx:5:1
+Error: Export WattpadPreview doesn't exist in target module
+  3 | import { useCallback, useEffect, useMemo, useState } from "react"
+  4 | import { createSupabaseBrowserClient } from "@/lib/supabase-browser"
+> 5 | import { WattpadPreview } from "@/lib/wattpad-markdown"
+    | ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  6 |
+  7 | type SourceMessage = { id: string; content: string | null; message_type: "story" | "author_...
+  8 | type Manuscript = { id: string; content: string; updated_at: string }
+
+The export WattpadPreview was not found in module [project]/src/lib/wattpad-markdown.tsx [app-client] (ecmascript).
+The module has no exports at all.
+All exports of the module are statically known (It doesn't have dynamic exports). So it's known statically that the requested export doesn't exist.
+
+Import traces:
+  Client Component Browser:
+    ./src/app/app/livro/[bookId]/capitulo/[chapterId]/EditorialPanel.tsx [Client Component Browser]
+    ./src/app/app/livro/[bookId]/capitulo/[chapterId]/page.tsx [Client Component Browser]
+    ./src/app/app/livro/[bookId]/capitulo/[chapterId]/page.tsx [Server Component]
+
+  Client Component SSR:
+    ./src/app/app/livro/[bookId]/capitulo/[chapterId]/EditorialPanel.tsx [Client Component SSR]
+    ./src/app/app/livro/[bookId]/capitulo/[chapterId]/page.tsx [Client Component SSR]
+    ./src/app/app/livro/[bookId]/capitulo/[chapterId]/page.tsx [Server Component] 
+[browser] ./src/app/app/livro/[bookId]/capitulo/[chapterId]/EditorialPanel.tsx:5:1
+Error: Export WattpadPreview doesn't exist in target module
+  3 | import { useCallback, useEffect, useMemo, useState } from "react"
+  4 | import { createSupabaseBrowserClient } from "@/lib/supabase-browser"
+> 5 | import { WattpadPreview } from "@/lib/wattpad-markdown"
+    | ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  6 |
+  7 | type SourceMessage = { id: string; content: string | null; message_type: "story" | "author_...
+  8 | type Manuscript = { id: string; content: string; updated_at: string }
+
+The export WattpadPreview was not found in module [project]/src/lib/wattpad-markdown.tsx [app-ssr] (ecmascript).
+The module has no exports at all.
+All exports of the module are statically known (It doesn't have dynamic exports). So it's known statically that the requested export doesn't exist.
+
+Import traces:
+  Client Component Browser:
+    ./src/app/app/livro/[bookId]/capitulo/[chapterId]/EditorialPanel.tsx [Client Component Browser]
+    ./src/app/app/livro/[bookId]/capitulo/[chapterId]/page.tsx [Client Component Browser]
+    ./src/app/app/livro/[bookId]/capitulo/[chapterId]/page.tsx [Server Component]
+
+  Client Component SSR:
+    ./src/app/app/livro/[bookId]/capitulo/[chapterId]/EditorialPanel.tsx [Client Component SSR]
+    ./src/app/app/livro/[bookId]/capitulo/[chapterId]/page.tsx [Client Component SSR]
+    ./src/app/app/livro/[bookId]/capitulo/[chapterId]/page.tsx [Server Component] 
+[browser] ./src/app/app/livro/[bookId]/capitulo/[chapterId]/page.tsx:8:46
+Error: Expected ';', got 'no substitution template literal'
+   6 | ...ort { createSupabaseBrowserClient } from "@/lib/supabase-browser"
+   7 | ...ort OllamaStatus from "./OllamaStatus"
+>  8 | ...ort EditorialPanel from "./EditorialPanel"`r`nimport { WattpadMessage } from "@/lib/wat...
+     |                                              ^^^
+   9 | ...e Message={id:string;author_id:string;content:string|null;message_type:"story"|"author_...
+  10 | ...e Chapter={id:string;title:string;chapter_number:number}
+  11 | ...ort default function ChapterPage(){
+
+Parsing ecmascript source code failed
+
+Import traces:
+  Client Component Browser:
+    ./src/app/app/livro/[bookId]/capitulo/[chapterId]/page.tsx [Client Component Browser]
+    ./src/app/app/livro/[bookId]/capitulo/[chapterId]/page.tsx [Server Component]
+
+  Client Component SSR:
+    ./src/app/app/livro/[bookId]/capitulo/[chapterId]/page.tsx [Client Component SSR]
+    ./src/app/app/livro/[bookId]/capitulo/[chapterId]/page.tsx [Server Component] 
+ GET /app/livro/0a80a0a1-69a0-45cc-bf30-be20f3972c35/capitulo/d7cdbdb4-07dd-48db-9bdc-5b3de4e64aff 200 in 46ms (next.js: 19ms, application-code: 28ms)
+ GET /api/ollama/health?model=qwen3%3A4b-instruct 200 in 747ms (next.js: 6ms, application-code: 741ms)
+ GET /api/ollama/health?model=qwen3%3A4b-instruct 200 in 372ms (next.js: 15ms, application-code: 357ms)
+ POST /api/ollama/compile 200 in 25.2s (next.js: 10ms, application-code: 25.2s)
+ POST /api/ollama/review 502 in 23.6s (next.js: 11ms, application-code: 23.5s)
+ GET /app/livro/0a80a0a1-69a0-45cc-bf30-be20f3972c35/capitulo/d7cdbdb4-07dd-48db-9bdc-5b3de4e64aff 200 in 86ms (next.js: 13ms, application-code: 73ms)
+ GET /app/livro/0a80a0a1-69a0-45cc-bf30-be20f3972c35/capitulo/d7cdbdb4-07dd-48db-9bdc-5b3de4e64aff 200 in 72ms (next.js: 10ms, application-code: 61ms)
+⨯ Error: The default export is not a React Component in "/app/livro/[bookId]/capitulo/[chapterId]/page"
+    at ignore-listed frames
+⨯ Error: The default export is not a React Component in "/app/livro/[bookId]/capitulo/[chapterId]/page"
+    at ignore-listed frames {
+  page: '/app/livro/0a80a0a1-69a0-45cc-bf30-be20f3972c35/capitulo/d7cdbdb4-07dd-48db-9bdc-5b3de4e64aff'
+}
+✓ Compiled in 5ms
+ GET /app/livro/0a80a0a1-69a0-45cc-bf30-be20f3972c35/capitulo/d7cdbdb4-07dd-48db-9bdc-5b3de4e64aff 500 in 928ms (next.js: 885ms, application-code: 43ms)
+ GET /app/livro/0a80a0a1-69a0-45cc-bf30-be20f3972c35/capitulo/d7cdbdb4-07dd-48db-9bdc-5b3de4e64aff 200 in 54ms (next.js: 17ms, application-code: 36ms)
+ GET /app/livro/0a80a0a1-69a0-45cc-bf30-be20f3972c35/capitulo/d7cdbdb4-07dd-48db-9bdc-5b3de4e64aff 200 in 127ms (next.js: 7ms, application-code: 120ms)
+ GET /api/ollama/health?model=qwen3%3A4b-instruct 200 in 304ms (next.js: 4ms, application-code: 300ms)
+ GET /app/livro/0a80a0a1-69a0-45cc-bf30-be20f3972c35/capitulo/d7cdbdb4-07dd-48db-9bdc-5b3de4e64aff 200 in 55ms (next.js: 12ms, application-code: 43ms)
+ GET /app/livro/0a80a0a1-69a0-45cc-bf30-be20f3972c35/capitulo/d7cdbdb4-07dd-48db-9bdc-5b3de4e64aff 200 in 33ms (next.js: 6ms, application-code: 27ms)
+ GET /app/livro/0a80a0a1-69a0-45cc-bf30-be20f3972c35/capitulo/d7cdbdb4-07dd-48db-9bdc-5b3de4e64aff 200 in 116ms (next.js: 44ms, application-code: 72ms)
+ GET /api/ollama/health?model=qwen3%3A4b-instruct 200 in 324ms (next.js: 17ms, application-code: 307ms)
+ POST /api/ollama/review 502 in 42s (next.js: 20ms, application-code: 42s)
+ GET /app/livro/0a80a0a1-69a0-45cc-bf30-be20f3972c35/capitulo/d7cdbdb4-07dd-48db-9bdc-5b3de4e64aff 200 in 84ms (next.js: 13ms, application-code: 71ms)
+ GET /app/livro/0a80a0a1-69a0-45cc-bf30-be20f3972c35/capitulo/d7cdbdb4-07dd-48db-9bdc-5b3de4e64aff 200 in 34ms (next.js: 9ms, application-code: 25ms)
+ GET /app/livro/0a80a0a1-69a0-45cc-bf30-be20f3972c35/capitulo/d7cdbdb4-07dd-48db-9bdc-5b3de4e64aff 200 in 73ms (next.js: 13ms, application-code: 60ms)
+ GET /api/ollama/health?model=qwen3%3A4b-instruct 200 in 309ms (next.js: 6ms, application-code: 304ms)
+ POST /api/ollama/review 200 in 33.4s (next.js: 8ms, application-code: 33.4s)
+✓ Compiled in 64ms
+ GET /app/livro/0a80a0a1-69a0-45cc-bf30-be20f3972c35/capitulo/d7cdbdb4-07dd-48db-9bdc-5b3de4e64aff 200 in 45ms (next.js: 16ms, application-code: 29ms)
+[browser] Uncaught Error: Element type is invalid: expected a string (for built-in components) or a class/function (for composite components) but got: object. You likely forgot to export your component from the file it's defined in, or you might have mixed up default and named imports.
+
+Check the render method of `ChapterPage`.
+    at ChapterPage (src/app/app/livro/[bookId]/capitulo/[chapterId]/page.tsx:36:1)
+  34 | <header className="sticky top-0 z-10 flex items-center gap-4 border-b border-[#53624e] bg-[#65735f] px-5 py-4 text-white"><Link href={"/app/livro/"+bookId} className="text-xl">←</Link><div><p className="text-xs uppercase tracking-...
+  35 | </header>
+> 36 | <EditorialPanel chapterId={chapterId} messages={messages} />
+     | ^
+  37 | <section className="flex-1 space-y-4 bg-[radial-gradient(#d9cfc3_0.7px,transparent_0.7px)] [background-size:14px_14px] p-4 sm:p-6">{error&&<div className="rounded-2xl bg-[#fbe8e3] p-4 text-sm text-[#8d493b]">{error}</div>}{message...
+  38 | <footer className="border-t border-[#d5c9bd] bg-[#fffdf8] p-3 sm:p-4"><div className="mb-2 flex gap-2"><button onClick={()=>setMessageType("story")} className={"rounded-full px-3 py-1 text-xs "+(message_type==="story"?"bg-[#65735f...
+  39 | }
+⚠ Fast Refresh had to perform a full reload due to a runtime error.
+✓ Compiled in 62ms
+ GET /app/livro/0a80a0a1-69a0-45cc-bf30-be20f3972c35/capitulo/d7cdbdb4-07dd-48db-9bdc-5b3de4e64aff 200 in 73ms (next.js: 12ms, application-code: 61ms)
+ GET /api/ollama/health?model=qwen3%3A4b-instruct 200 in 298ms (next.js: 5ms, application-code: 293ms)
+ GET /app/livro/0a80a0a1-69a0-45cc-bf30-be20f3972c35/capitulo/d7cdbdb4-07dd-48db-9bdc-5b3de4e64aff 200 in 40ms (next.js: 14ms, application-code: 26ms)
+✓ Compiled in 21ms
+[browser] Uncaught Error: Element type is invalid: expected a string (for built-in components) or a class/function (for composite components) but got: object. You likely forgot to export your component from the file it's defined in, or you might have mixed up default and named imports.
+
+Check the render method of `ChapterPage`.
+    at ChapterPage (src/app/app/livro/[bookId]/capitulo/[chapterId]/page.tsx:36:1)
+  34 | <header className="sticky top-0 z-10 flex items-center gap-4 border-b border-[#53624e] bg-[#65735f] px-5 py-4 text-white"><Link href={"/app/livro/"+bookId} className="text-xl">←</Link><div><p className="text-xs uppercase tracking-...
+  35 | </header>
+> 36 | <EditorialPanel chapterId={chapterId} messages={messages} />
+     | ^
+  37 | <section className="flex-1 space-y-4 bg-[radial-gradient(#d9cfc3_0.7px,transparent_0.7px)] [background-size:14px_14px] p-4 sm:p-6">{error&&<div className="rounded-2xl bg-[#fbe8e3] p-4 text-sm text-[#8d493b]">{error}</div>}{message...
+  38 | <footer className="border-t border-[#d5c9bd] bg-[#fffdf8] p-3 sm:p-4"><div className="mb-2 flex gap-2"><button onClick={()=>setMessageType("story")} className={"rounded-full px-3 py-1 text-xs "+(message_type==="story"?"bg-[#65735f...
+  39 | }
+⚠ Fast Refresh had to perform a full reload due to a runtime error.
+✓ Compiled in 57ms
+ GET /app/livro/0a80a0a1-69a0-45cc-bf30-be20f3972c35/capitulo/d7cdbdb4-07dd-48db-9bdc-5b3de4e64aff 200 in 69ms (next.js: 15ms, application-code: 54ms)
+ GET /api/ollama/health?model=qwen3%3A4b-instruct 200 in 282ms (next.js: 4ms, application-code: 278ms)
+✓ Compiled in 21ms
+ GET /app/livro/0a80a0a1-69a0-45cc-bf30-be20f3972c35/capitulo/d7cdbdb4-07dd-48db-9bdc-5b3de4e64aff 200 in 41ms (next.js: 14ms, application-code: 27ms)
+[browser] Uncaught Error: Element type is invalid: expected a string (for built-in components) or a class/function (for composite components) but got: object. You likely forgot to export your component from the file it's defined in, or you might have mixed up default and named imports.
+
+Check the render method of `ChapterPage`.
+    at ChapterPage (src/app/app/livro/[bookId]/capitulo/[chapterId]/page.tsx:36:1)
+  34 | <header className="sticky top-0 z-10 flex items-center gap-4 border-b border-[#53624e] bg-[#65735f] px-5 py-4 text-white"><Link href={"/app/livro/"+bookId} className="text-xl">←</Link><div><p className="text-xs uppercase tracking-...
+  35 | </header>
+> 36 | <EditorialPanel chapterId={chapterId} messages={messages} />
+     | ^
+  37 | <section className="flex-1 space-y-4 bg-[radial-gradient(#d9cfc3_0.7px,transparent_0.7px)] [background-size:14px_14px] p-4 sm:p-6">{error&&<div className="rounded-2xl bg-[#fbe8e3] p-4 text-sm text-[#8d493b]">{error}</div>}{message...
+  38 | <footer className="border-t border-[#d5c9bd] bg-[#fffdf8] p-3 sm:p-4"><div className="mb-2 flex gap-2"><button onClick={()=>setMessageType("story")} className={"rounded-full px-3 py-1 text-xs "+(message_type==="story"?"bg-[#65735f...
+  39 | }
+⚠ Fast Refresh had to perform a full reload due to a runtime error.
+✓ Compiled in 51ms
+ GET /app/livro/0a80a0a1-69a0-45cc-bf30-be20f3972c35/capitulo/d7cdbdb4-07dd-48db-9bdc-5b3de4e64aff 200 in 58ms (next.js: 9ms, application-code: 49ms)
+ GET /api/ollama/health?model=qwen3%3A4b-instruct 200 in 283ms (next.js: 4ms, application-code: 279ms)
+✓ Compiled in 20ms
+ GET /app/livro/0a80a0a1-69a0-45cc-bf30-be20f3972c35/capitulo/d7cdbdb4-07dd-48db-9bdc-5b3de4e64aff 200 in 43ms (next.js: 14ms, application-code: 29ms)
+[browser] Uncaught Error: Element type is invalid: expected a string (for built-in components) or a class/function (for composite components) but got: object. You likely forgot to export your component from the file it's defined in, or you might have mixed up default and named imports.
+
+Check the render method of `ChapterPage`.
+    at ChapterPage (src/app/app/livro/[bookId]/capitulo/[chapterId]/page.tsx:36:1)
+  34 | <header className="sticky top-0 z-10 flex items-center gap-4 border-b border-[#53624e] bg-[#65735f] px-5 py-4 text-white"><Link href={"/app/livro/"+bookId} className="text-xl">←</Link><div><p className="text-xs uppercase tracking-...
+  35 | </header>
+> 36 | <EditorialPanel chapterId={chapterId} messages={messages} />
+     | ^
+  37 | <section className="flex-1 space-y-4 bg-[radial-gradient(#d9cfc3_0.7px,transparent_0.7px)] [background-size:14px_14px] p-4 sm:p-6">{error&&<div className="rounded-2xl bg-[#fbe8e3] p-4 text-sm text-[#8d493b]">{error}</div>}{message...
+  38 | <footer className="border-t border-[#d5c9bd] bg-[#fffdf8] p-3 sm:p-4"><div className="mb-2 flex gap-2"><button onClick={()=>setMessageType("story")} className={"rounded-full px-3 py-1 text-xs "+(message_type==="story"?"bg-[#65735f...
+  39 | }
+⚠ Fast Refresh had to perform a full reload due to a runtime error.
+✓ Compiled in 43ms
+ GET /app/livro/0a80a0a1-69a0-45cc-bf30-be20f3972c35/capitulo/d7cdbdb4-07dd-48db-9bdc-5b3de4e64aff 200 in 61ms (next.js: 11ms, application-code: 51ms)
+ GET /api/ollama/health?model=qwen3%3A4b-instruct 200 in 256ms (next.js: 3ms, application-code: 252ms)
+✓ Compiled in 27ms
+ GET /app/livro/0a80a0a1-69a0-45cc-bf30-be20f3972c35/capitulo/d7cdbdb4-07dd-48db-9bdc-5b3de4e64aff 200 in 43ms (next.js: 13ms, application-code: 29ms)
+[browser] Uncaught Error: Element type is invalid: expected a string (for built-in components) or a class/function (for composite components) but got: object. You likely forgot to export your component from the file it's defined in, or you might have mixed up default and named imports.
+
+Check the render method of `ChapterPage`.
+    at ChapterPage (src/app/app/livro/[bookId]/capitulo/[chapterId]/page.tsx:36:1)
+  34 | <header className="sticky top-0 z-10 flex items-center gap-4 border-b border-[#53624e] bg-[#65735f] px-5 py-4 text-white"><Link href={"/app/livro/"+bookId} className="text-xl">←</Link><div><p className="text-xs uppercase tracking-...
+  35 | </header>
+> 36 | <EditorialPanel chapterId={chapterId} messages={messages} />
+     | ^
+  37 | <section className="flex-1 space-y-4 bg-[radial-gradient(#d9cfc3_0.7px,transparent_0.7px)] [background-size:14px_14px] p-4 sm:p-6">{error&&<div className="rounded-2xl bg-[#fbe8e3] p-4 text-sm text-[#8d493b]">{error}</div>}{message...
+  38 | <footer className="border-t border-[#d5c9bd] bg-[#fffdf8] p-3 sm:p-4"><div className="mb-2 flex gap-2"><button onClick={()=>setMessageType("story")} className={"rounded-full px-3 py-1 text-xs "+(message_type==="story"?"bg-[#65735f...
+  39 | }
+⚠ Fast Refresh had to perform a full reload due to a runtime error.
+✓ Compiled in 43ms
+ GET /app/livro/0a80a0a1-69a0-45cc-bf30-be20f3972c35/capitulo/d7cdbdb4-07dd-48db-9bdc-5b3de4e64aff 200 in 103ms (next.js: 13ms, application-code: 89ms)
+ GET /api/ollama/health?model=qwen3%3A4b-instruct 200 in 268ms (next.js: 4ms, application-code: 264ms)
+ GET /app/livro/0a80a0a1-69a0-45cc-bf30-be20f3972c35/capitulo/d7cdbdb4-07dd-48db-9bdc-5b3de4e64aff 200 in 39ms (next.js: 13ms, application-code: 26ms)
+✓ Compiled in 19ms
+[browser] Uncaught Error: Element type is invalid: expected a string (for built-in components) or a class/function (for composite components) but got: object. You likely forgot to export your component from the file it's defined in, or you might have mixed up default and named imports.
+
+Check the render method of `ChapterPage`.
+    at ChapterPage (src/app/app/livro/[bookId]/capitulo/[chapterId]/page.tsx:36:1)
+  34 | <header className="sticky top-0 z-10 flex items-center gap-4 border-b border-[#53624e] bg-[#65735f] px-5 py-4 text-white"><Link href={"/app/livro/"+bookId} className="text-xl">←</Link><div><p className="text-xs uppercase tracking-...
+  35 | </header>
+> 36 | <EditorialPanel chapterId={chapterId} messages={messages} />
+     | ^
+  37 | <section className="flex-1 space-y-4 bg-[radial-gradient(#d9cfc3_0.7px,transparent_0.7px)] [background-size:14px_14px] p-4 sm:p-6">{error&&<div className="rounded-2xl bg-[#fbe8e3] p-4 text-sm text-[#8d493b]">{error}</div>}{message...
+  38 | <footer className="border-t border-[#d5c9bd] bg-[#fffdf8] p-3 sm:p-4"><div className="mb-2 flex gap-2"><button onClick={()=>setMessageType("story")} className={"rounded-full px-3 py-1 text-xs "+(message_type==="story"?"bg-[#65735f...
+  39 | }
+⚠ Fast Refresh had to perform a full reload due to a runtime error.
+✓ Compiled in 43ms
+ GET /app/livro/0a80a0a1-69a0-45cc-bf30-be20f3972c35/capitulo/d7cdbdb4-07dd-48db-9bdc-5b3de4e64aff 200 in 64ms (next.js: 10ms, application-code: 55ms)
+ GET /api/ollama/health?model=qwen3%3A4b-instruct 200 in 265ms (next.js: 5ms, application-code: 261ms)
+ GET /app/livro/0a80a0a1-69a0-45cc-bf30-be20f3972c35/capitulo/d7cdbdb4-07dd-48db-9bdc-5b3de4e64aff 200 in 64ms (next.js: 12ms, application-code: 52ms)
+ GET /api/ollama/health?model=qwen3%3A4b-instruct 200 in 660ms (next.js: 4ms, application-code: 656ms)
+ POST /api/ollama/review 200 in 38.9s (next.js: 3ms, application-code: 38.9s)
+✓ Compiled in 25ms
+ GET /app/livro/0a80a0a1-69a0-45cc-bf30-be20f3972c35/capitulo/d7cdbdb4-07dd-48db-9bdc-5b3de4e64aff 200 in 64ms (next.js: 22ms, application-code: 41ms)
+⚠ Fast Refresh had to perform a full reload due to a runtime error.
+✓ Compiled in 77ms
+⚠ Fast Refresh had to perform a full reload due to a runtime error.
+ GET /app/livro/0a80a0a1-69a0-45cc-bf30-be20f3972c35/capitulo/d7cdbdb4-07dd-48db-9bdc-5b3de4e64aff 200 in 100ms (next.js: 14ms, application-code: 85ms)
+ GET /api/ollama/health?model=qwen3%3A4b-instruct 200 in 288ms (next.js: 7ms, application-code: 281ms)
+✓ Compiled in 24ms
+ GET /app/livro/0a80a0a1-69a0-45cc-bf30-be20f3972c35/capitulo/d7cdbdb4-07dd-48db-9bdc-5b3de4e64aff 200 in 47ms (next.js: 17ms, application-code: 29ms)
+⚠ Fast Refresh had to perform a full reload due to a runtime error.
+✓ Compiled in 45ms
+ GET /app/livro/0a80a0a1-69a0-45cc-bf30-be20f3972c35/capitulo/d7cdbdb4-07dd-48db-9bdc-5b3de4e64aff 200 in 62ms (next.js: 9ms, application-code: 53ms)
+ GET /api/ollama/health?model=qwen3%3A4b-instruct 200 in 660ms (next.js: 5ms, application-code: 655ms)
+✓ Compiled in 22ms
+ GET /app/livro/0a80a0a1-69a0-45cc-bf30-be20f3972c35/capitulo/d7cdbdb4-07dd-48db-9bdc-5b3de4e64aff 200 in 49ms (next.js: 15ms, application-code: 33ms)
+✓ Compiled in 54ms
+⚠ Fast Refresh had to perform a full reload due to a runtime error.
+ GET /app/livro/0a80a0a1-69a0-45cc-bf30-be20f3972c35/capitulo/d7cdbdb4-07dd-48db-9bdc-5b3de4e64aff 200 in 80ms (next.js: 12ms, application-code: 67ms)
+ GET /api/ollama/health?model=qwen3%3A4b-instruct 200 in 265ms (next.js: 4ms, application-code: 261ms)
+ GET /app/livro/0a80a0a1-69a0-45cc-bf30-be20f3972c35/capitulo/d7cdbdb4-07dd-48db-9bdc-5b3de4e64aff 200 in 77ms (next.js: 14ms, application-code: 63ms)
+ GET /api/ollama/health?model=qwen3%3A4b-instruct 200 in 284ms (next.js: 4ms, application-code: 280ms)
+ GET /app/livro/0a80a0a1-69a0-45cc-bf30-be20f3972c35/capitulo/d7cdbdb4-07dd-48db-9bdc-5b3de4e64aff 200 in 65ms (next.js: 13ms, application-code: 52ms)
+ GET /api/ollama/health?model=qwen3%3A4b 200 in 257ms (next.js: 4ms, application-code: 253ms)
+ GET /api/ollama/health?model=qwen3%3A4b-instruct 200 in 696ms (next.js: 5ms, application-code: 691ms)
+ POST /api/ollama/compile 200 in 26.7s (next.js: 14ms, application-code: 26.7s)
+ POST /api/ollama/review 200 in 39.7s (next.js: 13ms, application-code: 39.7s)
+ POST /api/ollama/review 200 in 38.1s (next.js: 5ms, application-code: 38.1s)
+✓ Compiled in 83ms
+ GET /api/ollama/health?model=qwen3%3A4b-instruct 200 in 567ms (next.js: 91ms, application-code: 476ms)
+ GET /app/livro/0a80a0a1-69a0-45cc-bf30-be20f3972c35/capitulo/d7cdbdb4-07dd-48db-9bdc-5b3de4e64aff 200 in 578ms (next.js: 165ms, application-code: 412ms)
+ GET /api/ollama/health?model=qwen3%3A4b 200 in 282ms (next.js: 7ms, application-code: 275ms)
+ GET /api/ollama/health?model=qwen3%3A4b 200 in 282ms (next.js: 5ms, application-code: 277ms)
+ GET /api/ollama/health?model=qwen3%3A4b-instruct 200 in 283ms (next.js: 6ms, application-code: 277ms)
+ GET /api/ollama/health?model=qwen3%3A4b-instruct 200 in 256ms (next.js: 6ms, application-code: 250ms)
+ POST /api/ollama/compile 200 in 28.3s (next.js: 6ms, application-code: 28.3s)
+ GET /app/livro/0a80a0a1-69a0-45cc-bf30-be20f3972c35 200 in 246ms (next.js: 114ms, application-code: 132ms)
+ GET /app 200 in 983ms (next.js: 930ms, application-code: 53ms)
+ GET /app/livro/0a80a0a1-69a0-45cc-bf30-be20f3972c35 200 in 104ms (next.js: 63ms, application-code: 41ms)
+ GET /app/livro/0a80a0a1-69a0-45cc-bf30-be20f3972c35/capitulo/d7cdbdb4-07dd-48db-9bdc-5b3de4e64aff 200 in 85ms (next.js: 48ms, application-code: 37ms)
+ GET /api/ollama/health?model=qwen3%3A4b-instruct 200 in 307ms (next.js: 25ms, application-code: 283ms)
+ POST /api/ollama/review 200 in 52s (next.js: 37ms, application-code: 52s)
+ GET /app/livro/0a80a0a1-69a0-45cc-bf30-be20f3972c35 200 in 103ms (next.js: 17ms, application-code: 86ms)
+ GET /app 200 in 66ms (next.js: 45ms, application-code: 21ms)
+ GET /app/livro/0a80a0a1-69a0-45cc-bf30-be20f3972c35 200 in 38ms (next.js: 13ms, application-code: 25ms)
+ GET /app/livro/0a80a0a1-69a0-45cc-bf30-be20f3972c35 200 in 73ms (next.js: 26ms, application-code: 47ms)
+ GET /api/ollama/health?model=qwen3%3A4b-instruct 200 in 440ms (next.js: 29ms, application-code: 411ms)
+ GET /app/livro/0a80a0a1-69a0-45cc-bf30-be20f3972c35/capitulo/d7cdbdb4-07dd-48db-9bdc-5b3de4e64aff 200 in 1538ms (next.js: 648ms, application-code: 890ms)
+ GET /app/livro/0a80a0a1-69a0-45cc-bf30-be20f3972c35/capitulo/d7cdbdb4-07dd-48db-9bdc-5b3de4e64aff 200 in 152ms (next.js: 35ms, application-code: 117ms)
+ GET /app/livro/0a80a0a1-69a0-45cc-bf30-be20f3972c35/capitulo/d7cdbdb4-07dd-48db-9bdc-5b3de4e64aff 200 in 47ms (next.js: 17ms, application-code: 31ms)
+ GET /app/livro/0a80a0a1-69a0-45cc-bf30-be20f3972c35 200 in 143ms (next.js: 68ms, application-code: 75ms)
+ GET /app/livro/0a80a0a1-69a0-45cc-bf30-be20f3972c35/capitulo/d7cdbdb4-07dd-48db-9bdc-5b3de4e64aff 200 in 37ms (next.js: 12ms, application-code: 25ms)
+ GET /api/ollama/health?model=qwen3%3A4b-instruct 200 in 455ms (next.js: 29ms, application-code: 426ms)
+ GET /app/livro/0a80a0a1-69a0-45cc-bf30-be20f3972c35 200 in 38ms (next.js: 11ms, application-code: 28ms)
+ GET /app/livro/0a80a0a1-69a0-45cc-bf30-be20f3972c35/capitulo/d7cdbdb4-07dd-48db-9bdc-5b3de4e64aff 200 in 42ms (next.js: 13ms, application-code: 29ms)
+ GET /api/ollama/health?model=qwen3%3A4b-instruct 200 in 391ms (next.js: 7ms, application-code: 384ms)
+ POST /api/ollama/review 200 in 54s (next.js: 22ms, application-code: 54s)
+ GET /app/livro/0a80a0a1-69a0-45cc-bf30-be20f3972c35/capitulo/d7cdbdb4-07dd-48db-9bdc-5b3de4e64aff 200 in 119ms (next.js: 16ms, application-code: 103ms)
+ GET /app/livro/0a80a0a1-69a0-45cc-bf30-be20f3972c35/capitulo/d7cdbdb4-07dd-48db-9bdc-5b3de4e64aff 200 in 129ms (next.js: 43ms, application-code: 86ms)
+⚠ Found a change in next.config.ts. Restarting the server to apply the changes...
+▲ Next.js 16.3.1 (Turbopack)
+- Local:         http://localhost:3000
+- Network:       http://26.31.66.113:3000
+- Environments: .env.local
+✓ Ready in 858ms
+✓ Running next.config.ts took 106ms
+
+[browser] Failed to fetch RSC payload for http://localhost:3000/app/livro/0a80a0a1-69a0-45cc-bf30-be20f3972c35/capitulo/d7cdbdb4-07dd-48db-9bdc-5b3de4e64aff. Falling back to browser navigation. TypeError: Failed to fetch
+ GET /app/livro/0a80a0a1-69a0-45cc-bf30-be20f3972c35/capitulo/d7cdbdb4-07dd-48db-9bdc-5b3de4e64aff 200 in 1862ms (next.js: 1559ms, application-code: 303ms)
+ GET /api/ollama/health?model=qwen3%3A4b-instruct 200 in 495ms (next.js: 112ms, application-code: 383ms)
+✓ Compiled in 47ms
+ GET /app/livro/0a80a0a1-69a0-45cc-bf30-be20f3972c35/capitulo/d7cdbdb4-07dd-48db-9bdc-5b3de4e64aff 200 in 66ms (next.js: 24ms, application-code: 42ms)
+⨯ Error: The default export is not a React Component in "/app/livro/[bookId]/capitulo/[chapterId]/page"
+    at ignore-listed frames
+⨯ Error: The default export is not a React Component in "/app/livro/[bookId]/capitulo/[chapterId]/page"
+    at ignore-listed frames {
+  page: '/app/livro/0a80a0a1-69a0-45cc-bf30-be20f3972c35/capitulo/d7cdbdb4-07dd-48db-9bdc-5b3de4e64aff'
+}
+ GET /app/livro/0a80a0a1-69a0-45cc-bf30-be20f3972c35/capitulo/d7cdbdb4-07dd-48db-9bdc-5b3de4e64aff 500 in 1195ms (next.js: 972ms, application-code: 223ms)
+⨯ Error: The default export is not a React Component in "/app/livro/[bookId]/capitulo/[chapterId]/page"
+    at ignore-listed frames
+⨯ Error: The default export is not a React Component in "/app/livro/[bookId]/capitulo/[chapterId]/page"
+    at ignore-listed frames {
+  page: '/app/livro/0a80a0a1-69a0-45cc-bf30-be20f3972c35/capitulo/d7cdbdb4-07dd-48db-9bdc-5b3de4e64aff'
+}
+ GET /app/livro/0a80a0a1-69a0-45cc-bf30-be20f3972c35/capitulo/d7cdbdb4-07dd-48db-9bdc-5b3de4e64aff 500 in 82ms (next.js: 69ms, application-code: 13ms)
+[browser] Uncaught Error: The default export is not a React Component in "/app/livro/[bookId]/capitulo/[chapterId]/page"
+ GET /app/livro/0a80a0a1-69a0-45cc-bf30-be20f3972c35/capitulo/d7cdbdb4-07dd-48db-9bdc-5b3de4e64aff 200 in 123ms (next.js: 19ms, application-code: 103ms)
+ GET /api/ollama/health?model=qwen3%3A4b-instruct 200 in 315ms (next.js: 6ms, application-code: 308ms)
+ GET /app/livro/0a80a0a1-69a0-45cc-bf30-be20f3972c35/capitulo/d7cdbdb4-07dd-48db-9bdc-5b3de4e64aff 200 in 48ms (next.js: 15ms, application-code: 33ms)
+ GET /app/livro/0a80a0a1-69a0-45cc-bf30-be20f3972c35/capitulo/d7cdbdb4-07dd-48db-9bdc-5b3de4e64aff 200 in 38ms (next.js: 7ms, application-code: 30ms)
+✓ Compiled in 233ms
+✓ Compiled in 106ms
+✓ Compiled in 46ms
+Turbopack build encountered 1 error:
+./src/app
+Error: Could not find the Next.js package (next/package.json)
+Resolved from: C:\Users\fid4\ProjetosPessoais\Inertia\src\app
+Filesystem root used for resolution: C:\Users\fid4\ProjetosPessoais\Inertia
+
+Possible causes:
+  - node_modules is being reorganized by a concurrent install (e.g. pnpm adding a package with a `next` peer dependency). This is transient and should clear once the install completes.
+  - node_modules/next was removed, renamed, or has a broken symlink.
+  - The workspace root is incorrect — see turbopack.root in the Next.js config docs for how to configure it.
+  - In a monorepo, the Next.js package may only exist in a directory above the closest directory containing a package manager lockfile. The workspace root is detected by locating the nearest package manager lockfile.
+  - Next.js is installed globally rather than as a project dependency. This is not supported; install it locally.
+
+Note: To ensure a hermetic build and a portable cache, files outside of the workspace root are not compiled.
+
+https://nextjs.org/docs/app/api-reference/config/next-config-js/turbopack#root-directory
+
+
+✓ Compiled in 2.5s
+Turbopack build encountered 2 errors:
+./package.json:1:1
+Error: Error parsing package.json file
+package.json is not parseable: invalid JSON: EOF while parsing a value at line 1 column 0
+
+
+./src/app
+Error: Could not find the Next.js package (next/package.json)
+Resolved from: C:\Users\fid4\ProjetosPessoais\Inertia\src\app
+Filesystem root used for resolution: C:\Users\fid4\ProjetosPessoais\Inertia
+
+Possible causes:
+  - node_modules is being reorganized by a concurrent install (e.g. pnpm adding a package with a `next` peer dependency). This is transient and should clear once the install completes.
+  - node_modules/next was removed, renamed, or has a broken symlink.
+  - The workspace root is incorrect — see turbopack.root in the Next.js config docs for how to configure it.
+  - In a monorepo, the Next.js package may only exist in a directory above the closest directory containing a package manager lockfile. The workspace root is detected by locating the nearest package manager lockfile.
+  - Next.js is installed globally rather than as a project dependency. This is not supported; install it locally.
+
+Note: To ensure a hermetic build and a portable cache, files outside of the workspace root are not compiled.
+
+https://nextjs.org/docs/app/api-reference/config/next-config-js/turbopack#root-directory
+
+
+✓ Compiled in 45ms
+Turbopack build encountered 1 error:
+./src/app
+Error: Could not find the Next.js package (next/package.json)
+Resolved from: C:\Users\fid4\ProjetosPessoais\Inertia\src\app
+Filesystem root used for resolution: C:\Users\fid4\ProjetosPessoais\Inertia
+
+Possible causes:
+  - node_modules is being reorganized by a concurrent install (e.g. pnpm adding a package with a `next` peer dependency). This is transient and should clear once the install completes.
+  - node_modules/next was removed, renamed, or has a broken symlink.
+  - The workspace root is incorrect — see turbopack.root in the Next.js config docs for how to configure it.
+  - In a monorepo, the Next.js package may only exist in a directory above the closest directory containing a package manager lockfile. The workspace root is detected by locating the nearest package manager lockfile.
+  - Next.js is installed globally rather than as a project dependency. This is not supported; install it locally.
+
+Note: To ensure a hermetic build and a portable cache, files outside of the workspace root are not compiled.
+
+https://nextjs.org/docs/app/api-reference/config/next-config-js/turbopack#root-directory
+
+
