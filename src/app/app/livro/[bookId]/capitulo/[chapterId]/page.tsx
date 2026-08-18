@@ -345,9 +345,9 @@ export default function ChapterPage() {
       </main>
     )
   return (
-    <main className="min-h-screen bg-[#f6f1ea] text-[#253126]">
-      <div className="mx-auto flex min-h-screen max-w-4xl flex-col border-x border-[#e7ddd1] bg-[#efe7dc] shadow-[0_0_50px_rgba(91,73,54,0.08)]">
-        <header className="sticky top-0 z-10 flex items-start gap-4 border-b border-[#53624e] bg-[#65735f] px-5 py-4 text-white">
+    <main className="h-dvh min-h-screen bg-[#f6f1ea] text-[#253126]">
+      <div className="mx-auto flex h-full min-h-0 max-w-4xl flex-col border-x border-[#e7ddd1] bg-[#efe7dc] shadow-[0_0_50px_rgba(91,73,54,0.08)]">
+        <header className="shrink-0 flex items-start gap-4 border-b border-[#53624e] bg-[#65735f] px-5 py-4 text-white">
           <Link href={"/app/livro/" + bookId} className="pt-1 text-xl">
             ←
           </Link>
@@ -441,211 +441,213 @@ export default function ChapterPage() {
           <OllamaStatus />
         </header>
         {chapterNotice && (
-          <p className="border-b border-[#d5c9bd] bg-[#e4f2dc] px-4 py-2 text-sm text-[#36552d] sm:px-6">
+          <p className="shrink-0 border-b border-[#d5c9bd] bg-[#e4f2dc] px-4 py-2 text-sm text-[#36552d] sm:px-6">
             {chapterNotice}
           </p>
         )}
-        <EditorialPanel chapterId={chapterId} messages={messages} />
-        <section className="flex-1 space-y-4 bg-[radial-gradient(#d9cfc3_0.7px,transparent_0.7px)] [background-size:14px_14px] p-4 sm:p-6">
-          {error && (
-            <div className="rounded-2xl bg-[#fbe8e3] p-4 text-sm text-[#8d493b]">{error}</div>
-          )}
-          {messages.length === 0 ? (
-            <p className="mx-auto mt-12 max-w-sm rounded-2xl bg-[#fffdf8] p-5 text-center text-sm text-[#687065]">
-              A conversa começa aqui. Escreva a primeira ideia, cena ou observação para o outro
-              autor.
-            </p>
-          ) : (
-            messages.map((m) => {
-              const removed = Boolean(m.deleted_at)
-              return (
-                <article
-                  key={m.id}
-                  className={
-                    "w-fit max-w-[88%] break-words rounded-[1.35rem] px-4 py-3 shadow-sm " +
-                    ((m.author_id === userId ? "ml-auto " : "") +
-                      (m.message_type === "author_note"
-                        ? m.author_id === userId
-                          ? "bg-[#f2dfbf]"
-                          : "bg-[#f8eddc]"
-                        : m.author_id === userId
-                          ? "bg-[#dcf8c6]"
-                          : "bg-[#fffdf8]"))
-                  }
-                >
-                  {m.author_id !== userId && (
-                    <p className="mb-1 text-xs font-semibold text-[#65735f]">{m.display_name}</p>
-                  )}
-                  {editingId === m.id ? (
-                    <div>
-                      <div className="mb-2 flex gap-1">
-                        <button
-                          type="button"
-                          onClick={() => setEditMessageType("story")}
-                          className={
-                            "rounded-full px-2 py-1 text-[10px] " +
-                            (editMessageType === "story"
-                              ? "bg-[#65735f] text-white"
-                              : "bg-white/70 text-[#687065]")
-                          }
-                        >
-                          História
-                        </button>
-                        <button
-                          type="button"
-                          onClick={() => setEditMessageType("author_note")}
-                          className={
-                            "rounded-full px-2 py-1 text-[10px] " +
-                            (editMessageType === "author_note"
-                              ? "bg-[#8d6d4c] text-white"
-                              : "bg-white/70 text-[#687065]")
-                          }
-                        >
-                          Comentário
-                        </button>
+        <div className="min-h-0 flex-1 overflow-y-auto">
+          <EditorialPanel chapterId={chapterId} messages={messages} />
+          <section className="space-y-4 bg-[radial-gradient(#d9cfc3_0.7px,transparent_0.7px)] [background-size:14px_14px] p-4 sm:p-6">
+            {error && (
+              <div className="rounded-2xl bg-[#fbe8e3] p-4 text-sm text-[#8d493b]">{error}</div>
+            )}
+            {messages.length === 0 ? (
+              <p className="mx-auto mt-12 max-w-sm rounded-2xl bg-[#fffdf8] p-5 text-center text-sm text-[#687065]">
+                A conversa começa aqui. Escreva a primeira ideia, cena ou observação para o outro
+                autor.
+              </p>
+            ) : (
+              messages.map((m) => {
+                const removed = Boolean(m.deleted_at)
+                return (
+                  <article
+                    key={m.id}
+                    className={
+                      "w-fit max-w-[88%] break-words rounded-[1.35rem] px-4 py-3 shadow-sm " +
+                      ((m.author_id === userId ? "ml-auto " : "") +
+                        (m.message_type === "author_note"
+                          ? m.author_id === userId
+                            ? "bg-[#f2dfbf]"
+                            : "bg-[#f8eddc]"
+                          : m.author_id === userId
+                            ? "bg-[#dcf8c6]"
+                            : "bg-[#fffdf8]"))
+                    }
+                  >
+                    {m.author_id !== userId && (
+                      <p className="mb-1 text-xs font-semibold text-[#65735f]">{m.display_name}</p>
+                    )}
+                    {editingId === m.id ? (
+                      <div>
+                        <div className="mb-2 flex gap-1">
+                          <button
+                            type="button"
+                            onClick={() => setEditMessageType("story")}
+                            className={
+                              "rounded-full px-2 py-1 text-[10px] " +
+                              (editMessageType === "story"
+                                ? "bg-[#65735f] text-white"
+                                : "bg-white/70 text-[#687065]")
+                            }
+                          >
+                            História
+                          </button>
+                          <button
+                            type="button"
+                            onClick={() => setEditMessageType("author_note")}
+                            className={
+                              "rounded-full px-2 py-1 text-[10px] " +
+                              (editMessageType === "author_note"
+                                ? "bg-[#8d6d4c] text-white"
+                                : "bg-white/70 text-[#687065]")
+                            }
+                          >
+                            Comentário
+                          </button>
+                        </div>
+                        <div className="mb-2 flex gap-1">
+                          <button
+                            type="button"
+                            onClick={() => insertMarkup("editor", "**")}
+                            className="rounded-full bg-white/70 px-2 py-1 text-[10px] font-bold"
+                          >
+                            B
+                          </button>
+                          <button
+                            type="button"
+                            onClick={() => insertMarkup("editor", "*")}
+                            className="rounded-full bg-white/70 px-2 py-1 text-[10px] italic"
+                          >
+                            I
+                          </button>
+                          <button
+                            type="button"
+                            onClick={() => insertHeading("editor")}
+                            className="rounded-full bg-white/70 px-2 py-1 text-[10px]"
+                          >
+                            T
+                          </button>
+                        </div>
+                        <textarea
+                          id={`edit-${m.id}`}
+                          value={editValue}
+                          onChange={(e) => setEditValue(e.target.value)}
+                          rows={3}
+                          className="w-full rounded-xl border border-[#d5c9bd] bg-white p-3 text-[15px] leading-6 outline-none"
+                        />
+                        <div className="mt-2 flex justify-end gap-2">
+                          <button
+                            type="button"
+                            onClick={() => {
+                              setEditingId(null)
+                              setEditValue("")
+                            }}
+                            className="rounded-full bg-white/70 px-3 py-1 text-xs"
+                          >
+                            Cancelar
+                          </button>
+                          <button
+                            type="button"
+                            onClick={() => void saveEdit()}
+                            disabled={sending || !editValue.trim()}
+                            className="rounded-full bg-[#65735f] px-3 py-1 text-xs font-semibold text-white"
+                          >
+                            Salvar
+                          </button>
+                        </div>
                       </div>
-                      <div className="mb-2 flex gap-1">
-                        <button
-                          type="button"
-                          onClick={() => insertMarkup("editor", "**")}
-                          className="rounded-full bg-white/70 px-2 py-1 text-[10px] font-bold"
-                        >
-                          B
-                        </button>
-                        <button
-                          type="button"
-                          onClick={() => insertMarkup("editor", "*")}
-                          className="rounded-full bg-white/70 px-2 py-1 text-[10px] italic"
-                        >
-                          I
-                        </button>
-                        <button
-                          type="button"
-                          onClick={() => insertHeading("editor")}
-                          className="rounded-full bg-white/70 px-2 py-1 text-[10px]"
-                        >
-                          T
-                        </button>
+                    ) : confirmDeleteId === m.id ? (
+                      <div>
+                        <p className="text-sm text-[#6f5739]">Remover esta mensagem?</p>
+                        <div className="mt-2 flex justify-end gap-2">
+                          <button
+                            type="button"
+                            onClick={() => setConfirmDeleteId(null)}
+                            className="rounded-full px-2 py-1 text-xs text-[#687065]"
+                          >
+                            Cancelar
+                          </button>
+                          <button
+                            type="button"
+                            onClick={() => void softDelete(m.id)}
+                            disabled={deletingId === m.id}
+                            className="rounded-full px-2 py-1 text-xs font-semibold text-[#9a5548]"
+                          >
+                            {deletingId === m.id ? "…" : "Remover"}
+                          </button>
+                        </div>
                       </div>
-                      <textarea
-                        id={`edit-${m.id}`}
-                        value={editValue}
-                        onChange={(e) => setEditValue(e.target.value)}
-                        rows={3}
-                        className="w-full rounded-xl border border-[#d5c9bd] bg-white p-3 text-[15px] leading-6 outline-none"
-                      />
-                      <div className="mt-2 flex justify-end gap-2">
-                        <button
-                          type="button"
-                          onClick={() => {
-                            setEditingId(null)
-                            setEditValue("")
-                          }}
-                          className="rounded-full bg-white/70 px-3 py-1 text-xs"
-                        >
-                          Cancelar
-                        </button>
-                        <button
-                          type="button"
-                          onClick={() => void saveEdit()}
-                          disabled={sending || !editValue.trim()}
-                          className="rounded-full bg-[#65735f] px-3 py-1 text-xs font-semibold text-white"
-                        >
-                          Salvar
-                        </button>
-                      </div>
-                    </div>
-                  ) : confirmDeleteId === m.id ? (
-                    <div>
-                      <p className="text-sm text-[#6f5739]">Remover esta mensagem?</p>
-                      <div className="mt-2 flex justify-end gap-2">
-                        <button
-                          type="button"
-                          onClick={() => setConfirmDeleteId(null)}
-                          className="rounded-full px-2 py-1 text-xs text-[#687065]"
-                        >
-                          Cancelar
-                        </button>
-                        <button
-                          type="button"
-                          onClick={() => void softDelete(m.id)}
-                          disabled={deletingId === m.id}
-                          className="rounded-full px-2 py-1 text-xs font-semibold text-[#9a5548]"
-                        >
-                          {deletingId === m.id ? "…" : "Remover"}
-                        </button>
-                      </div>
-                    </div>
-                  ) : (
-                    <>
-                      <div className={"text-[15px] " + (removed ? "italic text-[#8b887f]" : "")}>
-                        {removed ? (
-                          <p>Mensagem removida</p>
-                        ) : (
-                          <WattpadMessage content={m.content || ""} />
-                        )}
-                      </div>
-                      <div className="mt-3 flex items-center justify-between gap-3 border-t border-black/5 pt-2 text-[10px] text-[#687065]">
-                        <span>
-                          {m.message_type === "author_note" ? "Comentário" : "História"} ·{" "}
-                          {new Date(m.created_at).toLocaleTimeString("pt-BR", {
-                            hour: "2-digit",
-                            minute: "2-digit",
-                          })}
-                          {m.edited_at ? " · editada" : ""}
-                        </span>
-                        {m.author_id === userId &&
-                          (removed ? (
-                            <button
-                              type="button"
-                              title="Recuperar esta mensagem"
-                              aria-label="Recuperar esta mensagem"
-                              onClick={() => void restoreMessage(m.id)}
-                              disabled={deletingId === m.id}
-                              className="rounded p-1 text-[#8b887f] transition hover:bg-black/5 hover:text-[#55704f]"
-                            >
-                              ↶
-                            </button>
+                    ) : (
+                      <>
+                        <div className={"text-[15px] " + (removed ? "italic text-[#8b887f]" : "")}>
+                          {removed ? (
+                            <p>Mensagem removida</p>
                           ) : (
-                            <span className="flex items-center gap-1">
+                            <WattpadMessage content={m.content || ""} />
+                          )}
+                        </div>
+                        <div className="mt-3 flex items-center justify-between gap-3 border-t border-black/5 pt-2 text-[10px] text-[#687065]">
+                          <span>
+                            {m.message_type === "author_note" ? "Comentário" : "História"} ·{" "}
+                            {new Date(m.created_at).toLocaleTimeString("pt-BR", {
+                              hour: "2-digit",
+                              minute: "2-digit",
+                            })}
+                            {m.edited_at ? " · editada" : ""}
+                          </span>
+                          {m.author_id === userId &&
+                            (removed ? (
                               <button
                                 type="button"
-                                title="Editar esta mensagem"
-                                aria-label="Editar esta mensagem"
-                                onClick={() => {
-                                  setEditingId(m.id)
-                                  setEditValue(m.content || "")
-                                  setEditMessageType(m.message_type)
-                                }}
+                                title="Recuperar esta mensagem"
+                                aria-label="Recuperar esta mensagem"
+                                onClick={() => void restoreMessage(m.id)}
+                                disabled={deletingId === m.id}
                                 className="rounded p-1 text-[#8b887f] transition hover:bg-black/5 hover:text-[#55704f]"
                               >
-                                ✎
+                                ↶
                               </button>
-                              <button
-                                type="button"
-                                title="Excluir esta mensagem"
-                                aria-label="Excluir esta mensagem"
-                                onClick={() => setConfirmDeleteId(m.id)}
-                                className="rounded p-1 text-[#8b887f] transition hover:bg-black/5 hover:text-[#9a5548]"
-                              >
-                                ×
-                              </button>
-                            </span>
-                          ))}
-                      </div>
-                    </>
-                  )}
-                </article>
-              )
-            })
-          )}
-          {otherTyping && (
-            <div className="sticky bottom-2 mx-auto w-fit rounded-full bg-[#fffdf8]/90 px-3 py-1 text-xs text-[#65735f] shadow-sm">
-              Digitando…
-            </div>
-          )}
-        </section>
-        <footer className="border-t border-[#d5c9bd] bg-[#fffdf8] p-3 sm:p-4">
+                            ) : (
+                              <span className="flex items-center gap-1">
+                                <button
+                                  type="button"
+                                  title="Editar esta mensagem"
+                                  aria-label="Editar esta mensagem"
+                                  onClick={() => {
+                                    setEditingId(m.id)
+                                    setEditValue(m.content || "")
+                                    setEditMessageType(m.message_type)
+                                  }}
+                                  className="rounded p-1 text-[#8b887f] transition hover:bg-black/5 hover:text-[#55704f]"
+                                >
+                                  ✎
+                                </button>
+                                <button
+                                  type="button"
+                                  title="Excluir esta mensagem"
+                                  aria-label="Excluir esta mensagem"
+                                  onClick={() => setConfirmDeleteId(m.id)}
+                                  className="rounded p-1 text-[#8b887f] transition hover:bg-black/5 hover:text-[#9a5548]"
+                                >
+                                  ×
+                                </button>
+                              </span>
+                            ))}
+                        </div>
+                      </>
+                    )}
+                  </article>
+                )
+              })
+            )}
+            {otherTyping && (
+              <div className="sticky bottom-2 mx-auto w-fit rounded-full bg-[#fffdf8]/90 px-3 py-1 text-xs text-[#65735f] shadow-sm">
+                Digitando…
+              </div>
+            )}
+          </section>
+        </div>
+        <footer className="shrink-0 border-t border-[#d5c9bd] bg-[#fffdf8] p-3 sm:p-4">
           <div className="mb-2 flex gap-2">
             <button
               onClick={() => setMessageType("story")}

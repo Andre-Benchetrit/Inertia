@@ -1,6 +1,7 @@
 ﻿"use client"
 
 import Link from "next/link"
+import Brand from "@/components/Brand"
 import { useParams, useRouter } from "next/navigation"
 import { useEffect, useState } from "react"
 import { createSupabaseBrowserClient } from "@/lib/supabase-browser"
@@ -50,7 +51,7 @@ export default function InvitePage() {
   return (
     <main className="flex min-h-screen items-center justify-center bg-[#f6f1ea] px-4 text-[#253126]">
       <section className="w-full max-w-md rounded-[2rem] bg-[#fffdf8] p-8 text-center shadow-sm">
-        <p className="text-xs font-semibold uppercase tracking-[0.2em] text-[#8d6d4c]">Inertia</p>
+        <Brand className="justify-center text-xs" />
         <h1 className="mt-3 text-2xl font-bold">Convite para colaborar</h1>
         {status && <p className="mt-5 text-sm text-[#687065]">{status}</p>}
         {error && (

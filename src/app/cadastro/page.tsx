@@ -3,6 +3,7 @@ import Link from "next/link"
 import { FormEvent, useState } from "react"
 import { useRouter } from "next/navigation"
 import { createSupabaseBrowserClient } from "@/lib/supabase-browser"
+import Brand from "@/components/Brand"
 export default function CadastroPage() {
   const router = useRouter()
   const [name, setName] = useState("")
@@ -34,9 +35,7 @@ export default function CadastroPage() {
   return (
     <main className="min-h-screen bg-[#f5f2eb] p-8 text-[#20251f]">
       <div className="mx-auto max-w-md pt-20">
-        <Link href="/" className="font-semibold tracking-[0.2em] text-[#65735f] uppercase">
-          Inertia
-        </Link>
+        <Brand />
         <div className="mt-8 rounded-3xl bg-[#fffdf8] p-8">
           <h1 className="text-3xl font-semibold">Criar conta</h1>
           <form onSubmit={submit} className="mt-8 space-y-4">

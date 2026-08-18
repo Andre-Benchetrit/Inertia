@@ -3,6 +3,7 @@ import Link from "next/link"
 import { FormEvent, useEffect, useState } from "react"
 import { useRouter } from "next/navigation"
 import { createSupabaseBrowserClient } from "@/lib/supabase-browser"
+import Brand from "@/components/Brand"
 type Book = { id: string; title: string; description: string; updated_at: string }
 export default function AppPage() {
   const router = useRouter()
@@ -70,9 +71,7 @@ export default function AppPage() {
       <div className="mx-auto max-w-5xl">
         <header className="flex flex-wrap items-center justify-between gap-4 border-b border-[#d8d4c9] pb-6">
           <div>
-            <p className="text-sm font-semibold tracking-[0.2em] text-[#65735f] uppercase">
-              Inertia
-            </p>
+            <Brand href="/" className="text-sm" />
             <h1 className="mt-3 text-4xl font-semibold">Meus livros</h1>
             <p className="mt-2 text-sm text-[#687065]">
               Um lugar para transformar ideias em capítulos.

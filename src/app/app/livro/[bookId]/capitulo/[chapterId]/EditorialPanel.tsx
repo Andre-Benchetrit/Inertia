@@ -218,6 +218,7 @@ function InlineManuscriptEditor({
 export default function EditorialPanel({ chapterId, messages }: Props) {
   const supabase = createSupabaseBrowserClient()
   const [tab, setTab] = useState<"source" | "manuscript">("source")
+  const [isExpanded, setIsExpanded] = useState(false)
   const [manuscript, setManuscript] = useState<Manuscript | null>(null)
   const [versions, setVersions] = useState<Version[]>([])
   const [suggestions, setSuggestions] = useState<Suggestion[]>([])
@@ -591,355 +592,393 @@ export default function EditorialPanel({ chapterId, messages }: Props) {
   }
 
   return (
-    <section className="border-b border-[#d5c9bd] bg-[#fffdf8] p-3 sm:p-4">
-      <div className="flex flex-wrap items-center justify-between gap-2">
-        <div>
-          <p className="text-xs font-semibold uppercase tracking-widest text-[#65735f]">
-            Sprint 2 · Editorial
-          </p>
-          <h2 className="text-lg font-semibold text-[#253126]">Fonte e Manuscrito</h2>
-        </div>
-        <div className="flex gap-1 rounded-full bg-[#f0ebe3] p-1">
-          <button
-            type="button"
-            onClick={() => setTab("source")}
-            className={`rounded-full px-3 py-1 text-xs ${tab === "source" ? "bg-[#65735f] text-white" : "text-[#65735f]"}`}
-          >
-            Fonte
-          </button>
-          <button
-            type="button"
-            onClick={() => setTab("manuscript")}
-            className={`rounded-full px-3 py-1 text-xs ${tab === "manuscript" ? "bg-[#65735f] text-white" : "text-[#65735f]"}`}
-          >
-            Manuscrito
-          </button>
-        </div>
-      </div>
-      {error && (
-        <p className="mt-3 rounded-lg bg-[#f9e1dc] px-3 py-2 text-sm text-[#7b302b]">{error}</p>
-      )}
-      {notice && (
-        <p className="mt-3 rounded-lg bg-[#e4f2dc] px-3 py-2 text-sm text-[#36552d]">{notice}</p>
-      )}
-      {compiling && (
-        <div
-          className="mt-3 rounded-lg border border-[#d5c9bd] bg-[#f7f2ea] px-3 py-2"
-          role="status"
-          aria-live="polite"
+    <section className="sticky top-0 z-20 border-b border-[#d5c9bd] bg-[#fffdf8]">
+      <button
+        type="button"
+        onClick={() => setIsExpanded((current) => !current)}
+        className="flex w-full items-center justify-between gap-3 px-3 py-2 text-left transition-colors hover:bg-[#f8f3ec] sm:px-4"
+        aria-expanded={isExpanded}
+        aria-controls="editorial-panel-content"
+      >
+        <span className="flex min-w-0 items-center gap-2">
+          <span className="text-xs font-semibold uppercase tracking-[0.18em] text-[#65735f]">
+            INERTIA - AI
+          </span>
+          <span className="truncate text-xs text-[#9a8c7c]">
+            · {tab === "source" ? "Fonte" : "Manuscrito"}
+          </span>
+        </span>
+        <span
+          className={`shrink-0 text-sm text-[#65735f] transition-transform ${isExpanded ? "rotate-180" : ""}`}
+          aria-hidden="true"
         >
-          <div
-            className="mb-2 h-1.5 overflow-hidden rounded-full bg-[#ded5ca]"
-            role="progressbar"
-            aria-valuemin={0}
-            aria-valuemax={100}
-            aria-valuenow={compileProgress}
-          >
-            <div
-              className="h-full rounded-full bg-[#65735f] transition-all duration-300"
-              style={{ width: `${compileProgress}%` }}
-            />
-          </div>
-          <p className="text-sm font-medium text-[#36552d]">{stageLabels[compileStage]}</p>
-          <p className="mt-1 text-xs text-[#65735f]">
-            A Fonte será preservada. O Manuscrito receberá apenas a nova versão formatada.
-          </p>
-        </div>
-      )}
-      {reviewing && (
+          ⌄
+        </span>
+      </button>
+      {isExpanded && (
         <div
-          className="mt-3 flex items-center gap-2 rounded-lg border border-[#d5c9bd] bg-[#f7f2ea] px-3 py-2 text-sm text-[#36552d]"
-          role="status"
-          aria-live="polite"
+          id="editorial-panel-content"
+          className="max-h-[70vh] overflow-y-auto overscroll-contain border-t border-[#eee6dc] px-3 pb-3 sm:px-4"
         >
-          <span className="inline-block h-2 w-2 animate-pulse rounded-full bg-[#65735f]" />{" "}
-          <span>{reviewStage}</span>
-          <span className="text-xs text-[#65735f]">A Fonte não será alterada.</span>
-        </div>
-      )}
-      {ollamaCheck && !compiling && <p className="mt-2 text-xs text-[#36552d]">{ollamaCheck}</p>}
-      {loading ? (
-        <p className="mt-3 text-sm text-[#65735f]">Carregando camada editorial…</p>
-      ) : tab === "source" ? (
-        <div className="mt-3 grid gap-3 md:grid-cols-[1fr_auto]">
-          <div className="max-h-56 space-y-2 overflow-y-auto rounded-xl border border-[#e3d8cc] bg-[#f8f3ec] p-3">
-            {source.length ? (
-              source.map((message) => (
-                <p key={message.id} className="text-sm leading-6 text-[#253126]">
-                  <span className="mr-2 text-xs text-[#65735f]">#{message.sequence_number}</span>
-                  {message.content}
-                </p>
-              ))
-            ) : (
-              <p className="text-sm text-[#65735f]">
-                Ainda não há mensagens de História para compilar.
-              </p>
-            )}
-          </div>
-          <div className="flex flex-col gap-2">
-            <button
-              type="button"
-              onClick={() => void compileWithOllama()}
-              disabled={compiling || !source.length}
-              className="rounded-xl bg-[#65735f] px-3 py-2 text-sm font-semibold text-white disabled:opacity-50"
-            >
-              {compiling ? "Compilando…" : "Compilar com Ollama"}
-            </button>
-            <p className="max-w-48 text-xs leading-5 text-[#65735f]">
-              A Fonte é somente leitura. A IA organiza parágrafos e pode sugerir títulos e ênfases.
-            </p>
-          </div>
-          <div className="rounded-xl border border-[#d9cfc3] bg-[#fffdf8] p-3 md:col-span-2">
-            <div className="flex flex-wrap items-start justify-between gap-2">
-              <div>
-                <p className="text-sm font-semibold text-[#36552d]">Importar capítulo existente</p>
-                <p className="mt-1 max-w-2xl text-xs leading-5 text-[#65735f]">
-                  Cole um texto ou selecione um arquivo .txt/.md. A importação cria uma versão
-                  manual do Manuscrito e não transforma o conteúdo em mensagens da Fonte.
-                </p>
-              </div>
-              <span className="rounded-full bg-[#f0ebe3] px-2 py-1 text-[10px] text-[#65735f]">
-                Fonte intacta
-              </span>
+          <div className="flex flex-wrap items-center justify-end gap-2 pt-3">
+            <div className="flex gap-1 rounded-full bg-[#f0ebe3] p-1">
+              <button
+                type="button"
+                onClick={() => setTab("source")}
+                className={`rounded-full px-3 py-1 text-xs ${tab === "source" ? "bg-[#65735f] text-white" : "text-[#65735f]"}`}
+              >
+                Fonte
+              </button>
+              <button
+                type="button"
+                onClick={() => setTab("manuscript")}
+                className={`rounded-full px-3 py-1 text-xs ${tab === "manuscript" ? "bg-[#65735f] text-white" : "text-[#65735f]"}`}
+              >
+                Manuscrito
+              </button>
             </div>
-            <textarea
-              value={importText}
-              onChange={(event) => setImportText(event.target.value)}
-              rows={5}
-              placeholder="Cole aqui o texto do capítulo…"
-              className="mt-3 w-full resize-y rounded-xl border border-[#d9cfc3] bg-white p-3 text-sm leading-6 outline-none focus:border-[#65735f]"
-              aria-label="Texto do capítulo para importar"
-            />
-            <div className="mt-2 flex flex-wrap items-center justify-between gap-2">
-              <label className="cursor-pointer rounded-full border border-[#d9cfc3] px-3 py-1.5 text-xs font-semibold text-[#65735f] hover:bg-[#f0ebe3]">
-                Selecionar arquivo
-                <input
-                  type="file"
-                  accept=".txt,.md,text/plain,text/markdown"
-                  className="sr-only"
-                  onChange={async (event) => {
-                    const file = event.target.files?.[0]
-                    if (!file) return
-                    setImportFileName(file.name)
-                    setImportText(await file.text())
-                  }}
+          </div>
+          {error && (
+            <p className="mt-3 rounded-lg bg-[#f9e1dc] px-3 py-2 text-sm text-[#7b302b]">{error}</p>
+          )}
+          {notice && (
+            <p className="mt-3 rounded-lg bg-[#e4f2dc] px-3 py-2 text-sm text-[#36552d]">
+              {notice}
+            </p>
+          )}
+          {compiling && (
+            <div
+              className="mt-3 rounded-lg border border-[#d5c9bd] bg-[#f7f2ea] px-3 py-2"
+              role="status"
+              aria-live="polite"
+            >
+              <div
+                className="mb-2 h-1.5 overflow-hidden rounded-full bg-[#ded5ca]"
+                role="progressbar"
+                aria-valuemin={0}
+                aria-valuemax={100}
+                aria-valuenow={compileProgress}
+              >
+                <div
+                  className="h-full rounded-full bg-[#65735f] transition-all duration-300"
+                  style={{ width: `${compileProgress}%` }}
                 />
-              </label>
-              <div className="flex items-center gap-2">
-                {importFileName && (
-                  <span className="max-w-48 truncate text-xs text-[#65735f]">{importFileName}</span>
+              </div>
+              <p className="text-sm font-medium text-[#36552d]">{stageLabels[compileStage]}</p>
+              <p className="mt-1 text-xs text-[#65735f]">
+                A Fonte será preservada. O Manuscrito receberá apenas a nova versão formatada.
+              </p>
+            </div>
+          )}
+          {reviewing && (
+            <div
+              className="mt-3 flex items-center gap-2 rounded-lg border border-[#d5c9bd] bg-[#f7f2ea] px-3 py-2 text-sm text-[#36552d]"
+              role="status"
+              aria-live="polite"
+            >
+              <span className="inline-block h-2 w-2 animate-pulse rounded-full bg-[#65735f]" />{" "}
+              <span>{reviewStage}</span>
+              <span className="text-xs text-[#65735f]">A Fonte não será alterada.</span>
+            </div>
+          )}
+          {ollamaCheck && !compiling && (
+            <p className="mt-2 text-xs text-[#36552d]">{ollamaCheck}</p>
+          )}
+          {loading ? (
+            <p className="mt-3 text-sm text-[#65735f]">Carregando camada editorial…</p>
+          ) : tab === "source" ? (
+            <div className="mt-3 grid gap-3 md:grid-cols-[1fr_auto]">
+              <div className="space-y-2 rounded-xl border border-[#e3d8cc] bg-[#f8f3ec] p-3">
+                {source.length ? (
+                  source.map((message) => (
+                    <p key={message.id} className="text-sm leading-6 text-[#253126]">
+                      <span className="mr-2 text-xs text-[#65735f]">
+                        #{message.sequence_number}
+                      </span>
+                      {message.content}
+                    </p>
+                  ))
+                ) : (
+                  <p className="text-sm text-[#65735f]">
+                    Ainda não há mensagens de História para compilar.
+                  </p>
                 )}
+              </div>
+              <div className="flex flex-col gap-2">
                 <button
                   type="button"
-                  onClick={() => void importManuscript()}
-                  disabled={importing || !importText.trim()}
+                  onClick={() => void compileWithOllama()}
+                  disabled={compiling || !source.length}
                   className="rounded-xl bg-[#65735f] px-3 py-2 text-sm font-semibold text-white disabled:opacity-50"
                 >
-                  {importing ? "Importando…" : "Importar para o Manuscrito"}
+                  {compiling ? "Compilando…" : "Compilar com Ollama"}
                 </button>
+                <p className="max-w-48 text-xs leading-5 text-[#65735f]">
+                  A Fonte é somente leitura. A IA organiza parágrafos e pode sugerir títulos e
+                  ênfases.
+                </p>
+              </div>
+              <div className="rounded-xl border border-[#d9cfc3] bg-[#fffdf8] p-3 md:col-span-2">
+                <div className="flex flex-wrap items-start justify-between gap-2">
+                  <div>
+                    <p className="text-sm font-semibold text-[#36552d]">
+                      Importar capítulo existente
+                    </p>
+                    <p className="mt-1 max-w-2xl text-xs leading-5 text-[#65735f]">
+                      Cole um texto ou selecione um arquivo .txt/.md. A importação cria uma versão
+                      manual do Manuscrito e não transforma o conteúdo em mensagens da Fonte.
+                    </p>
+                  </div>
+                  <span className="rounded-full bg-[#f0ebe3] px-2 py-1 text-[10px] text-[#65735f]">
+                    Fonte intacta
+                  </span>
+                </div>
+                <textarea
+                  value={importText}
+                  onChange={(event) => setImportText(event.target.value)}
+                  rows={5}
+                  placeholder="Cole aqui o texto do capítulo…"
+                  className="mt-3 w-full resize-y rounded-xl border border-[#d9cfc3] bg-white p-3 text-sm leading-6 outline-none focus:border-[#65735f]"
+                  aria-label="Texto do capítulo para importar"
+                />
+                <div className="mt-2 flex flex-wrap items-center justify-between gap-2">
+                  <label className="cursor-pointer rounded-full border border-[#d9cfc3] px-3 py-1.5 text-xs font-semibold text-[#65735f] hover:bg-[#f0ebe3]">
+                    Selecionar arquivo
+                    <input
+                      type="file"
+                      accept=".txt,.md,text/plain,text/markdown"
+                      className="sr-only"
+                      onChange={async (event) => {
+                        const file = event.target.files?.[0]
+                        if (!file) return
+                        setImportFileName(file.name)
+                        setImportText(await file.text())
+                      }}
+                    />
+                  </label>
+                  <div className="flex items-center gap-2">
+                    {importFileName && (
+                      <span className="max-w-48 truncate text-xs text-[#65735f]">
+                        {importFileName}
+                      </span>
+                    )}
+                    <button
+                      type="button"
+                      onClick={() => void importManuscript()}
+                      disabled={importing || !importText.trim()}
+                      className="rounded-xl bg-[#65735f] px-3 py-2 text-sm font-semibold text-white disabled:opacity-50"
+                    >
+                      {importing ? "Importando…" : "Importar para o Manuscrito"}
+                    </button>
+                  </div>
+                </div>
               </div>
             </div>
-          </div>
-        </div>
-      ) : (
-        <div className="mt-3 space-y-3">
-          <div className="flex flex-wrap items-center justify-between gap-2">
-            <div className="flex gap-1 rounded-lg bg-[#f0ebe3] p-1">
-              <button
-                type="button"
-                onClick={() => setManuscriptView("preview")}
-                className={`rounded-md px-3 py-1 text-xs font-semibold ${manuscriptView === "preview" ? "bg-white text-[#36552d] shadow-sm" : "text-[#65735f]"}`}
-              >
-                Pré-visualizar
-              </button>
-              <button
-                type="button"
-                onClick={() => setManuscriptView("edit")}
-                className={`rounded-md px-3 py-1 text-xs font-semibold ${manuscriptView === "edit" ? "bg-white text-[#36552d] shadow-sm" : "text-[#65735f]"}`}
-              >
-                Editar texto
-              </button>
-            </div>
-            <p className="text-xs text-[#65735f]">
-              Markdown editorial: <code>## título</code> · <code>**negrito**</code> ·{" "}
-              <code>*itálico*</code> · <code>---</code>
-            </p>
-          </div>
-          {manuscriptView === "preview" ? (
-            <WattpadPreview content={draft} />
           ) : (
-            <InlineManuscriptEditor
-              content={draft}
-              changes={appliedChanges}
-              onChange={setDraft}
-              onRestore={restoreAppliedChange}
-            />
-          )}
-          {manuscriptView === "edit" && (
-            <div className="flex flex-wrap items-center gap-2">
-              <button
-                type="button"
-                onClick={() => void saveDraft()}
-                disabled={saving || !manuscript}
-                className="rounded-xl bg-[#65735f] px-3 py-2 text-sm font-semibold text-white disabled:opacity-50"
-              >
-                {saving ? "Salvando…" : "Salvar manuscrito"}
-              </button>
-              <button
-                type="button"
-                onClick={() => setManuscriptView("preview")}
-                className="rounded-xl border border-[#d9cfc3] px-3 py-2 text-sm font-semibold text-[#65735f]"
-              >
-                Ver formatação
-              </button>
-            </div>
-          )}
-          <div className="flex flex-wrap items-center gap-2">
-            <button
-              type="button"
-              onClick={() => void reviewWithOllama()}
-              disabled={
-                reviewing || !versions.length || selectedVersionData?.review_status === "completed"
-              }
-              className="rounded-xl border border-[#65735f] px-3 py-2 text-sm font-semibold text-[#65735f] disabled:opacity-50"
-            >
-              {reviewing
-                ? "Revisando…"
-                : selectedVersionData?.review_status === "completed"
-                  ? "Versão já revisada"
-                  : "Revisar com Ollama"}
-            </button>
-            <label className="text-xs text-[#65735f]">
-              Versão
-              <select
-                value={selectedVersion}
-                onChange={(event) => {
-                  setSelectedVersion(event.target.value)
-                  const version = versions.find((item) => item.id === event.target.value)
-                  if (version) {
-                    setDraft(version.content)
-                    setAppliedChanges([])
-                    setManuscriptView("preview")
-                  }
-                }}
-                className="ml-1 rounded-lg border border-[#d9cfc3] bg-white px-2 py-1"
-              >
-                {versions.map((version) => (
-                  <option key={version.id} value={version.id}>
-                    V{version.version_number} · {version.compilation_provider}
-                  </option>
-                ))}
-              </select>
-            </label>
-          </div>
-          <div className="border-t border-[#e3d8cc] pt-3">
-            <p className="text-xs font-semibold uppercase tracking-widest text-[#65735f]">
-              Versões e sugestões
-            </p>
-            {versions.length ? (
-              versions.map((version) => (
-                <div
-                  key={version.id}
-                  className="mt-2 rounded-lg border border-[#e3d8cc] p-2 text-xs"
-                >
+            <div className="mt-3 space-y-3">
+              <div className="flex flex-wrap items-center justify-between gap-2">
+                <div className="flex gap-1 rounded-lg bg-[#f0ebe3] p-1">
                   <button
                     type="button"
-                    onClick={() => {
-                      setSelectedVersion(version.id)
-                      setDraft(version.content)
-                      setAppliedChanges([])
-                      setManuscriptView("preview")
-                    }}
-                    className="font-semibold text-[#65735f]"
+                    onClick={() => setManuscriptView("preview")}
+                    className={`rounded-md px-3 py-1 text-xs font-semibold ${manuscriptView === "preview" ? "bg-white text-[#36552d] shadow-sm" : "text-[#65735f]"}`}
                   >
-                    V{version.version_number}
+                    Pré-visualizar
                   </button>
-                  <span className="ml-2 text-[#65735f]">
-                    {version.compilation_provider}
-                    {version.model_name ? ` · ${version.model_name}` : ""}
-                  </span>
-                  <span className="ml-2 rounded-full bg-[#f0ebe3] px-2 py-0.5 text-[#65735f]">
-                    {reviewStatusLabel(version.review_status)}
-                  </span>
-                  {version.review_status === "completed" && (
-                    <span className="ml-2 text-[#65735f]">
-                      {version.review_suggestion_count ?? 0} sugestão(ões)
-                    </span>
-                  )}
-                </div>
-              ))
-            ) : (
-              <p className="mt-2 text-sm text-[#65735f]">Nenhuma versão criada.</p>
-            )}
-            {visibleSuggestions.length ? (
-              <div className="mt-3 space-y-2">
-                <label className="flex items-center gap-2 text-xs text-[#65735f]">
-                  Mostrar sugestões de{" "}
-                  <select
-                    value={suggestionVersionFilter}
-                    onChange={(event) => setSuggestionVersionFilter(event.target.value)}
-                    className="rounded-lg border border-[#d9cfc3] bg-white px-2 py-1"
+                  <button
+                    type="button"
+                    onClick={() => setManuscriptView("edit")}
+                    className={`rounded-md px-3 py-1 text-xs font-semibold ${manuscriptView === "edit" ? "bg-white text-[#36552d] shadow-sm" : "text-[#65735f]"}`}
                   >
-                    <option value="latest">V{versions[0]?.version_number ?? "mais recente"}</option>
-                    <option value="all">Todas as versões</option>
+                    Editar texto
+                  </button>
+                </div>
+                <p className="text-xs text-[#65735f]">
+                  Markdown editorial: <code>## título</code> · <code>**negrito**</code> ·{" "}
+                  <code>*itálico*</code> · <code>---</code>
+                </p>
+              </div>
+              {manuscriptView === "preview" ? (
+                <WattpadPreview content={draft} />
+              ) : (
+                <InlineManuscriptEditor
+                  content={draft}
+                  changes={appliedChanges}
+                  onChange={setDraft}
+                  onRestore={restoreAppliedChange}
+                />
+              )}
+              {manuscriptView === "edit" && (
+                <div className="flex flex-wrap items-center gap-2">
+                  <button
+                    type="button"
+                    onClick={() => void saveDraft()}
+                    disabled={saving || !manuscript}
+                    className="rounded-xl bg-[#65735f] px-3 py-2 text-sm font-semibold text-white disabled:opacity-50"
+                  >
+                    {saving ? "Salvando…" : "Salvar manuscrito"}
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => setManuscriptView("preview")}
+                    className="rounded-xl border border-[#d9cfc3] px-3 py-2 text-sm font-semibold text-[#65735f]"
+                  >
+                    Ver formatação
+                  </button>
+                </div>
+              )}
+              <div className="flex flex-wrap items-center gap-2">
+                <button
+                  type="button"
+                  onClick={() => void reviewWithOllama()}
+                  disabled={
+                    reviewing ||
+                    !versions.length ||
+                    selectedVersionData?.review_status === "completed"
+                  }
+                  className="rounded-xl border border-[#65735f] px-3 py-2 text-sm font-semibold text-[#65735f] disabled:opacity-50"
+                >
+                  {reviewing
+                    ? "Revisando…"
+                    : selectedVersionData?.review_status === "completed"
+                      ? "Versão já revisada"
+                      : "Revisar com Ollama"}
+                </button>
+                <label className="text-xs text-[#65735f]">
+                  Versão
+                  <select
+                    value={selectedVersion}
+                    onChange={(event) => {
+                      setSelectedVersion(event.target.value)
+                      const version = versions.find((item) => item.id === event.target.value)
+                      if (version) {
+                        setDraft(version.content)
+                        setAppliedChanges([])
+                        setManuscriptView("preview")
+                      }
+                    }}
+                    className="ml-1 rounded-lg border border-[#d9cfc3] bg-white px-2 py-1"
+                  >
                     {versions.map((version) => (
-                      <option key={`filter-${version.id}`} value={version.id}>
-                        V{version.version_number}
+                      <option key={version.id} value={version.id}>
+                        V{version.version_number} · {version.compilation_provider}
                       </option>
                     ))}
                   </select>
-                  <span>({visibleSuggestions.length} únicas)</span>
                 </label>
-                {visibleSuggestions.map((suggestion) => (
-                  <article
-                    key={suggestion.id}
-                    className="rounded-lg border border-[#e3d8cc] bg-[#f8f3ec] p-3 text-sm"
-                  >
-                    <div className="flex items-center justify-between gap-2">
-                      <strong>{suggestionTypeLabel(suggestion.suggestion_type)}</strong>
-                      <span className="text-xs text-[#65735f]">
-                        {suggestionSeverityLabel(suggestion.severity)} ·{" "}
-                        {suggestionStatusLabel(suggestion.status)}
-                      </span>
-                    </div>
-                    <p className="mt-1 text-[#253126]">{suggestion.explanation}</p>
-                    {suggestion.original_text && (
-                      <p className="mt-2 whitespace-pre-wrap text-xs text-[#7b302b]">
-                        Fonte: {suggestion.original_text}
-                      </p>
-                    )}
-                    {suggestion.suggested_text && (
-                      <p className="mt-1 whitespace-pre-wrap text-xs text-[#36552d]">
-                        Proposta: {suggestion.suggested_text}
-                      </p>
-                    )}
-                    {suggestion.status === "pending" && (
-                      <div className="mt-2 flex gap-2">
-                        <button
-                          type="button"
-                          onClick={() => void acceptSuggestion(suggestion)}
-                          className="text-xs font-semibold text-[#36552d]"
-                        >
-                          Aceitar proposta
-                        </button>
-                        <button
-                          type="button"
-                          onClick={() => void rejectSuggestion(suggestion.id)}
-                          className="text-xs font-semibold text-[#7b302b]"
-                        >
-                          Rejeitar proposta
-                        </button>
-                      </div>
-                    )}
-                  </article>
-                ))}
               </div>
-            ) : (
-              <p className="mt-2 text-sm text-[#65735f]">
-                Nenhuma sugestão registrada. As decisões são sempre manuais.
-              </p>
-            )}
-          </div>
+              <div className="border-t border-[#e3d8cc] pt-3">
+                <p className="text-xs font-semibold uppercase tracking-widest text-[#65735f]">
+                  Versões e sugestões
+                </p>
+                {versions.length ? (
+                  versions.map((version) => (
+                    <div
+                      key={version.id}
+                      className="mt-2 rounded-lg border border-[#e3d8cc] p-2 text-xs"
+                    >
+                      <button
+                        type="button"
+                        onClick={() => {
+                          setSelectedVersion(version.id)
+                          setDraft(version.content)
+                          setAppliedChanges([])
+                          setManuscriptView("preview")
+                        }}
+                        className="font-semibold text-[#65735f]"
+                      >
+                        V{version.version_number}
+                      </button>
+                      <span className="ml-2 text-[#65735f]">
+                        {version.compilation_provider}
+                        {version.model_name ? ` · ${version.model_name}` : ""}
+                      </span>
+                      <span className="ml-2 rounded-full bg-[#f0ebe3] px-2 py-0.5 text-[#65735f]">
+                        {reviewStatusLabel(version.review_status)}
+                      </span>
+                      {version.review_status === "completed" && (
+                        <span className="ml-2 text-[#65735f]">
+                          {version.review_suggestion_count ?? 0} sugestão(ões)
+                        </span>
+                      )}
+                    </div>
+                  ))
+                ) : (
+                  <p className="mt-2 text-sm text-[#65735f]">Nenhuma versão criada.</p>
+                )}
+                {visibleSuggestions.length ? (
+                  <div className="mt-3 space-y-2">
+                    <label className="flex items-center gap-2 text-xs text-[#65735f]">
+                      Mostrar sugestões de{" "}
+                      <select
+                        value={suggestionVersionFilter}
+                        onChange={(event) => setSuggestionVersionFilter(event.target.value)}
+                        className="rounded-lg border border-[#d9cfc3] bg-white px-2 py-1"
+                      >
+                        <option value="latest">
+                          V{versions[0]?.version_number ?? "mais recente"}
+                        </option>
+                        <option value="all">Todas as versões</option>
+                        {versions.map((version) => (
+                          <option key={`filter-${version.id}`} value={version.id}>
+                            V{version.version_number}
+                          </option>
+                        ))}
+                      </select>
+                      <span>({visibleSuggestions.length} únicas)</span>
+                    </label>
+                    {visibleSuggestions.map((suggestion) => (
+                      <article
+                        key={suggestion.id}
+                        className="rounded-lg border border-[#e3d8cc] bg-[#f8f3ec] p-3 text-sm"
+                      >
+                        <div className="flex items-center justify-between gap-2">
+                          <strong>{suggestionTypeLabel(suggestion.suggestion_type)}</strong>
+                          <span className="text-xs text-[#65735f]">
+                            {suggestionSeverityLabel(suggestion.severity)} ·{" "}
+                            {suggestionStatusLabel(suggestion.status)}
+                          </span>
+                        </div>
+                        <p className="mt-1 text-[#253126]">{suggestion.explanation}</p>
+                        {suggestion.original_text && (
+                          <p className="mt-2 whitespace-pre-wrap text-xs text-[#7b302b]">
+                            Fonte: {suggestion.original_text}
+                          </p>
+                        )}
+                        {suggestion.suggested_text && (
+                          <p className="mt-1 whitespace-pre-wrap text-xs text-[#36552d]">
+                            Proposta: {suggestion.suggested_text}
+                          </p>
+                        )}
+                        {suggestion.status === "pending" && (
+                          <div className="mt-2 flex gap-2">
+                            <button
+                              type="button"
+                              onClick={() => void acceptSuggestion(suggestion)}
+                              className="text-xs font-semibold text-[#36552d]"
+                            >
+                              Aceitar proposta
+                            </button>
+                            <button
+                              type="button"
+                              onClick={() => void rejectSuggestion(suggestion.id)}
+                              className="text-xs font-semibold text-[#7b302b]"
+                            >
+                              Rejeitar proposta
+                            </button>
+                          </div>
+                        )}
+                      </article>
+                    ))}
+                  </div>
+                ) : (
+                  <p className="mt-2 text-sm text-[#65735f]">
+                    Nenhuma sugestão registrada. As decisões são sempre manuais.
+                  </p>
+                )}
+              </div>
+            </div>
+          )}
         </div>
       )}
     </section>
