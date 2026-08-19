@@ -47,6 +47,12 @@ export type ReviewProgress = {
   totalBlocks: number
 }
 
+export type ReviewBlockResult = {
+  suggestions: ReviewSuggestion[]
+  noIssuesReason: string | null
+  done_reason?: string
+}
+
 export class OllamaError extends Error {
   code: string
 
@@ -289,6 +295,12 @@ function normalizePart(value: string | null | undefined) {
     .toLocaleLowerCase("pt-BR")
 }
 
+function normalizeNoIssuesReason(value: unknown) {
+  if (typeof value !== "string") return null
+  const reason = value.replace(/\s+/g, " ").trim()
+  return reason ? reason.slice(0, 320) : null
+}
+
 export function suggestionKeyBrowser(item: ReviewSuggestion) {
   const original = normalizePart(item.original_text)
   const suggested = normalizePart(item.suggested_text)
@@ -372,7 +384,7 @@ ${instructions}
 
 O texto usa Markdown editorial para leitura em estilo Wattpad: ## indica título, linhas em branco indicam parágrafos, **texto** indica negrito, *texto* indica itálico e --- indica mudança de cena. Não trate esses marcadores como erros. Não corrija ação exagerada, onomatopeias, humor, linguagem coloquial, metáforas fortes ou escolhas típicas de ficção científica apenas por serem ousadas. Só sugira mudança de estilo quando houver um problema real de clareza, coerência ou adequação ao contexto fornecido.
 
-Procure problemas reais de gramática, coerência, continuidade e oportunidades pontuais de organização editorial. Sugira estilo apenas quando necessário. Não reescreva o texto inteiro e não aplique nenhuma sugestão automaticamente. Retorne somente JSON válido com uma chave suggestions contendo no máximo ${REVIEW_MAX_SUGGESTIONS_PER_BLOCK} objetos. Cada objeto deve ter suggestion_type (grammar, style, coherence, continuity ou editorial), severity (low, medium ou high), explanation, original_text, suggested_text e anchor. original_text deve ser um trecho inteiro e consecutivo do bloco, preservando exatamente os espaços e quebras de linha presentes no texto. Não misture trechos separados nem inclua texto de outro parágrafo. suggested_text deve substituir exatamente original_text e pode conter Markdown editorial. Se não houver problema relevante, retorne uma lista vazia.
+Procure problemas reais de gramática, coerência, continuidade e oportunidades pontuais de organização editorial. Sugira estilo apenas quando necessário. Não reescreva o texto inteiro e não aplique nenhuma sugestão automaticamente. Uma revisão sem sugestões é um resultado válido e preferível a um falso positivo: não crie propostas apenas para preencher o limite. Retorne somente JSON válido com as chaves suggestions e no_issues_reason. suggestions deve conter no máximo ${REVIEW_MAX_SUGGESTIONS_PER_BLOCK} objetos. Cada objeto deve ter suggestion_type (grammar, style, coherence, continuity ou editorial), severity (low, medium ou high), explanation, original_text, suggested_text e anchor. original_text deve ser um trecho inteiro e consecutivo do bloco, preservando exatamente os espaços e quebras de linha presentes no texto. Não misture trechos separados nem inclua texto de outro parágrafo. suggested_text deve substituir exatamente original_text e pode conter Markdown editorial. Se não houver problema relevante, retorne suggestions como lista vazia e escreva em no_issues_reason uma justificativa curta, objetiva e específica sobre por que o bloco foi considerado adequado. Não use uma frase genérica como “não há erros”; mencione os aspectos realmente observados, como gramática, clareza, coerência, continuidade ou respeito às instruções editoriais. Se houver sugestões, retorne no_issues_reason como null.
 
 BLOCO ${blockNumber} DE ${totalBlocks}:
 ${block}`
@@ -385,7 +397,7 @@ export async function reviewBlockLocal(
   totalBlocks: number,
   storyContext: string,
   editorialInstructions = "",
-): Promise<{ suggestions: ReviewSuggestion[]; done_reason?: string }> {
+): Promise<ReviewBlockResult> {
   const raw = await request<{ response?: string; done_reason?: string }>(
     "/api/generate",
     {
@@ -422,10 +434,20 @@ export async function reviewBlockLocal(
     )
   }
 
-  const suggestions = Array.isArray((parsed as { suggestions?: unknown })?.suggestions)
-    ? (parsed as { suggestions: unknown[] }).suggestions
-    : []
-  return { suggestions: normalizeSuggestions(suggestions), done_reason: raw.done_reason }
+  const parsedObject = parsed as {
+    suggestions?: unknown
+    no_issues_reason?: unknown
+  }
+  const suggestions = Array.isArray(parsedObject.suggestions) ? parsedObject.suggestions : []
+  const normalizedSuggestions = normalizeSuggestions(suggestions)
+  return {
+    suggestions: normalizedSuggestions,
+    noIssuesReason:
+      normalizedSuggestions.length === 0
+        ? normalizeNoIssuesReason(parsedObject.no_issues_reason)
+        : null,
+    done_reason: raw.done_reason,
+  }
 }
 
 export async function reviewWithOllama(

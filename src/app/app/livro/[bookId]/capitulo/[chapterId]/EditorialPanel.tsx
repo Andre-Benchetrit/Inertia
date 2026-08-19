@@ -36,6 +36,7 @@ type Version = {
   review_model_name?: string | null
   review_blocks?: number | null
   review_suggestion_count?: number | null
+  review_summary?: string | null
 }
 type Suggestion = {
   id: string
@@ -335,6 +336,15 @@ export default function EditorialPanel({ bookId, chapterId, messages }: Props) {
     ? Math.min(suggestionIndex, visibleSuggestions.length - 1)
     : 0
   const currentSuggestion = visibleSuggestions[activeSuggestionIndex]
+  const suggestionReviewVersion = useMemo(() => {
+    const versionId =
+      suggestionVersionFilter === "latest"
+        ? versions[0]?.id
+        : suggestionVersionFilter === "all"
+          ? ""
+          : suggestionVersionFilter
+    return versionId ? versions.find((version) => version.id === versionId) : null
+  }, [suggestionVersionFilter, versions])
 
   const loadEditorial = useCallback(async () => {
     setLoading(true)
@@ -343,7 +353,7 @@ export default function EditorialPanel({ bookId, chapterId, messages }: Props) {
       supabase
         .from("chapter_versions")
         .select(
-          "id,version_number,content,compilation_provider,model_name,prompt_version,created_at,review_status,review_started_at,reviewed_at,review_model_name,review_blocks,review_suggestion_count",
+          "id,version_number,content,compilation_provider,model_name,prompt_version,created_at,review_status,review_started_at,reviewed_at,review_model_name,review_blocks,review_suggestion_count,review_summary",
         )
         .eq("chapter_id", chapterId)
         .order("version_number", { ascending: false }),
@@ -638,6 +648,7 @@ export default function EditorialPanel({ bookId, chapterId, messages }: Props) {
     let reviewCompleted = false
     let processedBlocks = 0
     let savedSuggestionCount = 0
+    const cleanReasons: string[] = []
     const timer = window.setInterval(
       () =>
         setReviewStage((current) =>
@@ -731,6 +742,13 @@ export default function EditorialPanel({ bookId, chapterId, messages }: Props) {
           storyContext,
           editorialInstructions,
         )
+        if (!result.suggestions.length) {
+          cleanReasons.push(
+            result.noIssuesReason ??
+              "não foram identificados problemas objetivos de gramática, clareza, coerência, continuidade ou organização editorial neste bloco",
+          )
+        }
+
         const unique = result.suggestions.filter((item) => {
           const key = suggestionKeyBrowser(item)
           if (seen.has(key)) return false
@@ -767,11 +785,17 @@ export default function EditorialPanel({ bookId, chapterId, messages }: Props) {
       }
 
       setReviewStage("Finalizando a revisão...")
+      const reviewSummary =
+        totalSuggestionCount === 0
+          ? Array.from(new Set(cleanReasons)).slice(0, 3).join(" ").slice(0, 1000) ||
+            "A revisão não encontrou problemas objetivos que justificassem uma sugestão neste Manuscrito."
+          : null
       const { error: completeError } = await supabase.rpc("complete_chapter_version_review", {
         target_version_id: versionId,
         processed_blocks: processedBlocks,
         saved_suggestions: totalSuggestionCount,
         requested_model: activeModel,
+        requested_summary: reviewSummary,
       })
       if (completeError)
         throw new Error(
@@ -782,7 +806,9 @@ export default function EditorialPanel({ bookId, chapterId, messages }: Props) {
       setSuggestionIndex(0)
       await loadEditorial()
       setNotice(
-        `Revisão concluída: ${processedBlocks} bloco(s), ${savedSuggestionCount} sugestão(ões) nova(s).`,
+        reviewSummary
+          ? `Revisão concluída sem sugestões. ${reviewSummary}`
+          : `Revisão concluída: ${processedBlocks} bloco(s), ${savedSuggestionCount} sugestão(ões) nova(s).`,
       )
     } catch (caught) {
       setError(caught instanceof Error ? caught.message : "Falha desconhecida durante a revisão.")
@@ -1323,6 +1349,13 @@ export default function EditorialPanel({ bookId, chapterId, messages }: Props) {
                         />
                       ))}
                     </div>
+                  </div>
+                ) : suggestionReviewVersion?.review_status === "completed" &&
+                  suggestionReviewVersion.review_suggestion_count === 0 &&
+                  suggestionReviewVersion.review_summary ? (
+                  <div className="mt-3 rounded-lg border border-[#cddac6] bg-[#f1f6ee] p-3 text-sm text-[#36552d]">
+                    <p className="font-semibold">Revisão concluída sem sugestões</p>
+                    <p className="mt-1 leading-6">{suggestionReviewVersion.review_summary}</p>
                   </div>
                 ) : (
                   <p className="mt-2 text-sm text-[#65735f]">
