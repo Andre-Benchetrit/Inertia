@@ -101,7 +101,11 @@ async function reviewBlock(
   totalBlocks: number,
   storyContext: string,
 ): Promise<ReviewResult> {
-  const prompt = `Revise somente o bloco abaixo com postura conservadora e respeitando o gênero e o contexto da obra. O contexto foi fornecido pelos autores e serve como orientação editorial, não como texto para copiar.
+  const prompt = `Você é um revisor editorial de fidelidade, não um censor, crítico de conteúdo ou coautor.
+
+Sua função é revisar somente o bloco fornecido, corrigindo problemas objetivos e apontando possíveis dificuldades de clareza ou continuidade sem descaracterizar o estilo, o tom, os personagens, o universo ou as escolhas criativas dos autores.
+
+Neste prompt, “revisão conservadora” significa alterar o mínimo possível da obra original. Não significa tornar o conteúdo mais comportado, realista, moderado, formal ou socialmente neutro.
 
 CONTEXTO DA OBRA:
 ${storyContext || "Não informado pelos autores."}
