@@ -9,6 +9,7 @@ type Book = {
   id: string
   title: string
   description: string
+  ai_instructions: string
   created_by: string
   created_at: string
   updated_at: string
@@ -32,8 +33,13 @@ export default function BookPage() {
   const [title, setTitle] = useState("")
   const [bookTitle, setBookTitle] = useState("")
   const [bookDescription, setBookDescription] = useState("")
+  const [aiInstructions, setAiInstructions] = useState("")
+  const [aiInstructionsDraft, setAiInstructionsDraft] = useState("")
+  const [bookTab, setBookTab] = useState<"summary" | "ai">("summary")
   const [editingBook, setEditingBook] = useState(false)
+  const [editingAiInstructions, setEditingAiInstructions] = useState(false)
   const [savingBook, setSavingBook] = useState(false)
+  const [savingAiInstructions, setSavingAiInstructions] = useState(false)
   const [error, setError] = useState("")
   const [loading, setLoading] = useState(true)
   const [isOwner, setIsOwner] = useState(false)
@@ -46,22 +52,36 @@ export default function BookPage() {
   async function load() {
     const current = await supabase.auth.getUser()
     const userId = current.data.user?.id
-    const b = await supabase
+    const modernBook = await supabase
       .from("books")
-      .select("id,title,description,created_by,created_at,updated_at")
+      .select("id,title,description,ai_instructions,created_by,created_at,updated_at")
       .eq("id", bookId)
       .maybeSingle()
+    let bookError = modernBook.error
+    let bookData = modernBook.data as Book | null
 
-    if (b.error || !b.data) {
-      setError(b.error?.message || "Livro não encontrado.")
+    if (bookError?.message.includes("ai_instructions")) {
+      const legacyBook = await supabase
+        .from("books")
+        .select("id,title,description,created_by,created_at,updated_at")
+        .eq("id", bookId)
+        .maybeSingle()
+      bookError = legacyBook.error
+      bookData = legacyBook.data ? ({ ...legacyBook.data, ai_instructions: "" } as Book) : null
+    }
+
+    if (bookError || !bookData) {
+      setError(bookError?.message || "Livro não encontrado.")
       setLoading(false)
       return
     }
 
-    const loadedBook = b.data as Book
+    const loadedBook = bookData
     setBook(loadedBook)
     setBookTitle(loadedBook.title)
     setBookDescription(loadedBook.description || "")
+    setAiInstructions(loadedBook.ai_instructions || "")
+    setAiInstructionsDraft(loadedBook.ai_instructions || "")
 
     const c = await supabase
       .from("chapters")
@@ -133,6 +153,44 @@ export default function BookPage() {
     setBookDescription(cleanDescription)
     setEditingBook(false)
     setSavingBook(false)
+  }
+
+  function startAiInstructionsEdit() {
+    setAiInstructionsDraft(aiInstructions)
+    setEditingAiInstructions(true)
+    setError("")
+  }
+
+  function cancelAiInstructionsEdit() {
+    setAiInstructionsDraft(aiInstructions)
+    setEditingAiInstructions(false)
+    setError("")
+  }
+
+  async function saveAiInstructions() {
+    if (!isOwner) return
+    const cleanInstructions = aiInstructionsDraft.trim()
+    if (cleanInstructions.length > 30000) {
+      setError("As instruções para a IA podem ter no máximo 30.000 caracteres.")
+      return
+    }
+
+    setSavingAiInstructions(true)
+    setError("")
+    const result = await supabase
+      .from("books")
+      .update({ ai_instructions: cleanInstructions })
+      .eq("id", bookId)
+
+    if (result.error) {
+      setError("Não foi possível salvar as instruções para a IA: " + result.error.message)
+    } else {
+      setAiInstructions(cleanInstructions)
+      setAiInstructionsDraft(cleanInstructions)
+      setBook((current) => (current ? { ...current, ai_instructions: cleanInstructions } : current))
+      setEditingAiInstructions(false)
+    }
+    setSavingAiInstructions(false)
   }
 
   async function add() {
@@ -338,11 +396,9 @@ export default function BookPage() {
                 </button>
               )}
             </div>
-            {book.description && (
-              <p className="mt-3 max-w-2xl whitespace-pre-wrap leading-7 text-[#687065]">
-                {book.description}
-              </p>
-            )}
+            <p className="mt-3 text-sm text-[#687065]">
+              Resumo, capítulos e orientação editorial reunidos em um só lugar.
+            </p>
           </div>
           {isOwner && (
             <button
@@ -356,6 +412,122 @@ export default function BookPage() {
           )}
         </header>
 
+        <section className="mt-6 overflow-hidden rounded-3xl border border-[#d7c7ae] bg-white/75 shadow-sm">
+          <div className="flex border-b border-[#e3d8cc] px-3 pt-3 sm:px-5">
+            <button
+              type="button"
+              role="tab"
+              aria-selected={bookTab === "summary"}
+              onClick={() => setBookTab("summary")}
+              className={
+                "border-b-2 px-3 py-2 text-sm font-semibold transition " +
+                (bookTab === "summary"
+                  ? "border-[#65735f] text-[#52614e]"
+                  : "border-transparent text-[#8b887f] hover:text-[#65735f]")
+              }
+            >
+              Resumo da obra
+            </button>
+            <button
+              type="button"
+              role="tab"
+              aria-selected={bookTab === "ai"}
+              onClick={() => setBookTab("ai")}
+              className={
+                "border-b-2 px-3 py-2 text-sm font-semibold transition " +
+                (bookTab === "ai"
+                  ? "border-[#8d6d4c] text-[#6f5739]"
+                  : "border-transparent text-[#8b887f] hover:text-[#8d6d4c]")
+              }
+            >
+              Instruções para IA
+            </button>
+          </div>
+          <div className="p-5 sm:p-6">
+            {bookTab === "summary" ? (
+              <div>
+                <p className="whitespace-pre-wrap leading-7 text-[#687065]">
+                  {book.description || "Nenhum resumo foi escrito ainda."}
+                </p>
+                <p className="mt-3 text-xs text-[#8b887f]">
+                  Este campo resume a obra para orientar leitores e colaboradores.
+                </p>
+              </div>
+            ) : editingAiInstructions ? (
+              <div>
+                <div className="flex items-start justify-between gap-3">
+                  <div>
+                    <p className="text-xs font-semibold uppercase tracking-[0.18em] text-[#8d6d4c]">
+                      Orientação editorial
+                    </p>
+                    <h2 className="mt-1 text-xl font-semibold">Como a IA deve trabalhar</h2>
+                  </div>
+                  <span className="text-xs text-[#8b887f]">{aiInstructionsDraft.length}/30000</span>
+                </div>
+                <textarea
+                  value={aiInstructionsDraft}
+                  onChange={(event) => setAiInstructionsDraft(event.target.value)}
+                  maxLength={30000}
+                  rows={10}
+                  autoFocus
+                  placeholder="Ex.: preserve o humor absurdo, não suavize a violência estilizada, mantenha a voz coloquial…"
+                  className="mt-4 w-full resize-y rounded-2xl border border-[#d5c9bd] bg-white px-4 py-3 leading-6 outline-none transition focus:border-[#8d6d4c]"
+                  aria-label="Instruções para a IA"
+                />
+                <p className="mt-2 text-xs leading-5 text-[#8b887f]">
+                  Use este espaço para gênero, tom, regras de estilo, mundo, personagens,
+                  preferências de revisão e limites que a IA deve respeitar.
+                </p>
+                <div className="mt-4 flex justify-end gap-2">
+                  <button
+                    type="button"
+                    onClick={cancelAiInstructionsEdit}
+                    disabled={savingAiInstructions}
+                    className="rounded-xl border border-[#d5c9bd] bg-white px-4 py-2 text-sm font-semibold text-[#687065] disabled:opacity-50"
+                  >
+                    Cancelar
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => void saveAiInstructions()}
+                    disabled={savingAiInstructions}
+                    className="rounded-xl bg-[#8d6d4c] px-4 py-2 text-sm font-semibold text-white transition hover:bg-[#755b40] disabled:opacity-50"
+                  >
+                    {savingAiInstructions ? "Salvando…" : "Salvar instruções"}
+                  </button>
+                </div>
+              </div>
+            ) : (
+              <div>
+                <div className="flex items-start justify-between gap-3">
+                  <div>
+                    <p className="text-xs font-semibold uppercase tracking-[0.18em] text-[#8d6d4c]">
+                      Contexto para a IA
+                    </p>
+                    <h2 className="mt-1 text-xl font-semibold">Instruções editoriais</h2>
+                  </div>
+                  {isOwner && (
+                    <button
+                      type="button"
+                      onClick={startAiInstructionsEdit}
+                      className="shrink-0 rounded-full border border-[#d5c9bd] bg-white px-3 py-1.5 text-xs font-semibold text-[#687065] transition hover:bg-[#fff8e9]"
+                    >
+                      Editar
+                    </button>
+                  )}
+                </div>
+                <p className="mt-4 whitespace-pre-wrap leading-7 text-[#687065]">
+                  {aiInstructions || "Nenhuma instrução foi definida ainda."}
+                </p>
+                <p className="mt-3 text-xs leading-5 text-[#8b887f]">
+                  Estas instruções são enviadas à IA junto com o resumo da obra e podem ser mais
+                  detalhadas que a descrição.
+                </p>
+              </div>
+            )}
+          </div>
+        </section>
+
         {isOwner && editingBook && (
           <section className="mt-6 rounded-3xl border border-[#d7c7ae] bg-white/80 p-5 shadow-sm sm:p-6">
             <div className="flex items-center justify-between gap-3">
@@ -363,7 +535,7 @@ export default function BookPage() {
                 <p className="text-xs font-semibold uppercase tracking-[0.18em] text-[#8d6d4c]">
                   Dados do livro
                 </p>
-                <h2 className="mt-1 text-xl font-semibold">Editar título e descrição</h2>
+                <h2 className="mt-1 text-xl font-semibold">Editar título e resumo da obra</h2>
               </div>
               <button
                 type="button"
@@ -385,13 +557,13 @@ export default function BookPage() {
                 />
               </label>
               <label className="block text-sm font-semibold text-[#253126]">
-                Descrição
+                Resumo da obra
                 <textarea
                   value={bookDescription}
                   onChange={(event) => setBookDescription(event.target.value)}
                   maxLength={2000}
                   rows={4}
-                  placeholder="Gênero, tom e contexto do livro para orientar a colaboração e a IA…"
+                  placeholder="Resumo breve da obra para leitores e colaboradores…"
                   className="mt-1 w-full resize-y rounded-xl border border-[#d5c9bd] bg-white px-4 py-3 font-normal leading-6 outline-none transition focus:border-[#8d6d4c]"
                 />
               </label>

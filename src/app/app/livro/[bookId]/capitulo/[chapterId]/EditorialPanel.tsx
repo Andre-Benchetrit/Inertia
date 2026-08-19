@@ -49,7 +49,7 @@ type Suggestion = {
   anchor: string | null
   created_at: string
 }
-type Props = { chapterId: string; messages: SourceMessage[] }
+type Props = { bookId: string; chapterId: string; messages: SourceMessage[] }
 type AppliedChange = {
   suggestionId: string
   versionId: string
@@ -265,7 +265,7 @@ function InlineManuscriptEditor({
   )
 }
 
-export default function EditorialPanel({ chapterId, messages }: Props) {
+export default function EditorialPanel({ bookId, chapterId, messages }: Props) {
   const supabase = createSupabaseBrowserClient()
   const [tab, setTab] = useState<"source" | "manuscript">("source")
   const [isExpanded, setIsExpanded] = useState(false)
@@ -500,8 +500,25 @@ export default function EditorialPanel({ chapterId, messages }: Props) {
         .map((row) => row.content)
         .join("\n\n")
         .slice(0, 180000)
+      const { data: book, error: bookError } = await supabase
+        .from("books")
+        .select("title,description,ai_instructions")
+        .eq("id", bookId)
+        .maybeSingle()
+      if (bookError)
+        throw new Error(`Não foi possível ler o contexto do livro: ${bookError.message}`)
+      if (!book) throw new Error("Livro não encontrado")
+      const storyContext = [
+        book.title ? `Título: ${book.title}` : "",
+        book.description ? `Resumo da obra: ${book.description}` : "",
+      ]
+        .filter(Boolean)
+        .join("\n")
+      const editorialInstructions = String(book.ai_instructions ?? "").trim()
       const blocks = splitIntoBlocks(sourceText)
-      const sourceSignature = compileSourceSignature(sourceText)
+      const sourceSignature = compileSourceSignature(
+        `${sourceText}\n\n[RESUMO]\n${storyContext}\n\n[INSTRUÇÕES]\n${editorialInstructions}`,
+      )
       const previousCheckpoint = readCompileCheckpoint(chapterId)
       const canResume = Boolean(
         previousCheckpoint &&
@@ -536,6 +553,8 @@ export default function EditorialPanel({ chapterId, messages }: Props) {
             blockNumber,
             blocks.length,
             previousTail,
+            storyContext,
+            editorialInstructions,
           )
         } catch (caught) {
           throw new Error(
@@ -650,16 +669,17 @@ export default function EditorialPanel({ chapterId, messages }: Props) {
 
       const { data: book, error: bookError } = await supabase
         .from("books")
-        .select("title,description")
+        .select("title,description,ai_instructions")
         .eq("id", chapter.book_id)
         .maybeSingle()
       if (bookError) throw new Error(bookError.message)
       const storyContext = [
         book?.title ? `Título: ${book.title}` : "",
-        book?.description ? `Descrição e possível gênero: ${book.description}` : "",
+        book?.description ? `Resumo da obra: ${book.description}` : "",
       ]
         .filter(Boolean)
         .join("\n")
+      const editorialInstructions = String(book?.ai_instructions ?? "").trim()
 
       const { data: startData, error: startError } = await supabase.rpc(
         "start_chapter_version_review",
@@ -709,6 +729,7 @@ export default function EditorialPanel({ chapterId, messages }: Props) {
           index + 1,
           blocks.length,
           storyContext,
+          editorialInstructions,
         )
         const unique = result.suggestions.filter((item) => {
           const key = suggestionKeyBrowser(item)

@@ -61,11 +61,12 @@ const OLLAMA_URL = "http://localhost:11434"
 const MAX_SOURCE_CHARS = 180000
 const REVIEW_BLOCK_CHARS = 9000
 const REVIEW_MAX_SUGGESTIONS_PER_BLOCK = 4
-const REVIEW_OUTPUT_TOKENS = 2048
+const REVIEW_OUTPUT_TOKENS = 3072
 const REVIEW_BLOCK_TIMEOUT_MS = 180000
 const COMPILE_BLOCK_CHARS = 9000
 const COMPILE_BLOCK_OUTPUT_TOKENS = 4096
 const COMPILE_BLOCK_TIMEOUT_MS = 180000
+const AI_INSTRUCTIONS_CONTEXT_TOKENS = 16384
 
 async function request<T>(
   path: string,
@@ -193,12 +194,24 @@ export function buildCompileBlockPrompt(
   blockNumber: number,
   totalBlocks: number,
   previousTail: string,
+  storyContext = "",
+  editorialInstructions = "",
 ) {
   const continuity = previousTail
     ? `Use o final do bloco anterior apenas para manter continuidade de voz, cena e parágrafo. Não repita esse trecho na resposta.\n\nFINAL DO BLOCO ANTERIOR:\n${previousTail}`
     : "Este é o primeiro bloco. Comece diretamente pelo texto editorial, sem prefácio."
+  const summary = storyContext.trim()
+    ? `RESUMO DA OBRA:\n${storyContext.trim()}`
+    : "RESUMO DA OBRA:\nNão informado pelos autores."
+  const instructions = editorialInstructions.trim()
+    ? `INSTRUÇÕES EDITORIAIS DOS AUTORES:\n${editorialInstructions.trim()}`
+    : "INSTRUÇÕES EDITORIAIS DOS AUTORES:\nNenhuma instrução adicional foi informada."
 
   return `Você é um editor de ficção e formatador editorial para leitura em estilo Wattpad. Compile somente este bloco da História, preservando fatos, voz, ordem e intenção. Não invente acontecimentos, personagens, lugares ou diálogos; não acrescente informações e não inclua Comentários dos autores. Retorne somente o bloco compilado em Markdown editorial, sem análise, prefácio, rótulos ou bloco de código.
+
+${summary}
+
+${instructions}
 
 Este é o bloco ${blockNumber} de ${totalBlocks}. ${continuity}
 
@@ -222,6 +235,8 @@ export async function compileBlockLocal(
   blockNumber: number,
   totalBlocks: number,
   previousTail: string,
+  storyContext = "",
+  editorialInstructions = "",
 ): Promise<{ response?: string; done_reason?: string }> {
   const raw = await request<{ response?: string; done_reason?: string }>(
     "/api/generate",
@@ -229,10 +244,21 @@ export async function compileBlockLocal(
       method: "POST",
       body: JSON.stringify({
         model,
-        prompt: buildCompileBlockPrompt(block, blockNumber, totalBlocks, previousTail),
+        prompt: buildCompileBlockPrompt(
+          block,
+          blockNumber,
+          totalBlocks,
+          previousTail,
+          storyContext,
+          editorialInstructions,
+        ),
         stream: false,
         think: false,
-        options: { num_predict: COMPILE_BLOCK_OUTPUT_TOKENS, temperature: 0.2 },
+        options: {
+          num_predict: COMPILE_BLOCK_OUTPUT_TOKENS,
+          temperature: 0.2,
+          num_ctx: AI_INSTRUCTIONS_CONTEXT_TOKENS,
+        },
       }),
     },
     COMPILE_BLOCK_TIMEOUT_MS,
@@ -331,11 +357,18 @@ function reviewPrompt(
   blockNumber: number,
   totalBlocks: number,
   storyContext: string,
+  editorialInstructions = "",
 ) {
+  const instructions = editorialInstructions.trim()
+    ? `INSTRUÇÕES EDITORIAIS DOS AUTORES:\n${editorialInstructions.trim()}`
+    : "INSTRUÇÕES EDITORIAIS DOS AUTORES:\nNenhuma instrução adicional foi informada."
+
   return `Revise somente o bloco abaixo com postura conservadora e respeitando o gênero e o contexto da obra. O contexto foi fornecido pelos autores e serve como orientação editorial, não como texto para copiar.
 
-CONTEXTO DA OBRA:
+RESUMO DA OBRA:
 ${storyContext || "Não informado pelos autores."}
+
+${instructions}
 
 O texto usa Markdown editorial para leitura em estilo Wattpad: ## indica título, linhas em branco indicam parágrafos, **texto** indica negrito, *texto* indica itálico e --- indica mudança de cena. Não trate esses marcadores como erros. Não corrija ação exagerada, onomatopeias, humor, linguagem coloquial, metáforas fortes ou escolhas típicas de ficção científica apenas por serem ousadas. Só sugira mudança de estilo quando houver um problema real de clareza, coerência ou adequação ao contexto fornecido.
 
@@ -351,6 +384,7 @@ export async function reviewBlockLocal(
   blockNumber: number,
   totalBlocks: number,
   storyContext: string,
+  editorialInstructions = "",
 ): Promise<{ suggestions: ReviewSuggestion[]; done_reason?: string }> {
   const raw = await request<{ response?: string; done_reason?: string }>(
     "/api/generate",
@@ -358,11 +392,15 @@ export async function reviewBlockLocal(
       method: "POST",
       body: JSON.stringify({
         model,
-        prompt: reviewPrompt(block, blockNumber, totalBlocks, storyContext),
+        prompt: reviewPrompt(block, blockNumber, totalBlocks, storyContext, editorialInstructions),
         stream: false,
         think: false,
         format: "json",
-        options: { num_predict: REVIEW_OUTPUT_TOKENS, temperature: 0.2 },
+        options: {
+          num_predict: REVIEW_OUTPUT_TOKENS,
+          temperature: 0.2,
+          num_ctx: AI_INSTRUCTIONS_CONTEXT_TOKENS,
+        },
       }),
     },
     REVIEW_BLOCK_TIMEOUT_MS,

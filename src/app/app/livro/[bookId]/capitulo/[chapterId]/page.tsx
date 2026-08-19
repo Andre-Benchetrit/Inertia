@@ -446,7 +446,7 @@ export default function ChapterPage() {
           </p>
         )}
         <div className="min-h-0 flex-1 overflow-y-auto">
-          <EditorialPanel chapterId={chapterId} messages={messages} />
+          <EditorialPanel bookId={bookId} chapterId={chapterId} messages={messages} />
           <section className="space-y-4 bg-[radial-gradient(#d9cfc3_0.7px,transparent_0.7px)] [background-size:14px_14px] p-4 sm:p-6">
             {error && (
               <div className="rounded-2xl bg-[#fbe8e3] p-4 text-sm text-[#8d493b]">{error}</div>
