@@ -274,6 +274,7 @@ export default function EditorialPanel({ chapterId, messages }: Props) {
   const [suggestions, setSuggestions] = useState<Suggestion[]>([])
   const [selectedVersion, setSelectedVersion] = useState("")
   const [suggestionVersionFilter, setSuggestionVersionFilter] = useState("latest")
+  const [suggestionIndex, setSuggestionIndex] = useState(0)
   const [model] = useState(() =>
     typeof window === "undefined"
       ? ""
@@ -330,6 +331,10 @@ export default function EditorialPanel({ chapterId, messages }: Props) {
       return true
     })
   }, [suggestionVersionFilter, suggestions, versions])
+  const activeSuggestionIndex = visibleSuggestions.length
+    ? Math.min(suggestionIndex, visibleSuggestions.length - 1)
+    : 0
+  const currentSuggestion = visibleSuggestions[activeSuggestionIndex]
 
   const loadEditorial = useCallback(async () => {
     setLoading(true)
@@ -752,16 +757,22 @@ export default function EditorialPanel({ chapterId, messages }: Props) {
           `As sugestões foram salvas, mas não foi possível concluir o estado da revisão. ${completeError.message}`,
         )
       reviewCompleted = true
+      setSuggestionVersionFilter(versionId)
+      setSuggestionIndex(0)
+      await loadEditorial()
       setNotice(
         `Revisão concluída: ${processedBlocks} bloco(s), ${savedSuggestionCount} sugestão(ões) nova(s).`,
       )
-      await loadEditorial()
     } catch (caught) {
       setError(caught instanceof Error ? caught.message : "Falha desconhecida durante a revisão.")
-      if (processedBlocks || savedSuggestionCount)
+      if (processedBlocks || savedSuggestionCount) {
+        setSuggestionVersionFilter(versionId)
+        setSuggestionIndex(0)
+        await loadEditorial()
         setNotice(
           `Progresso preservado: ${processedBlocks} bloco(s) processado(s) e ${savedSuggestionCount} sugestão(ões) salva(s). Você pode tentar novamente; sugestões repetidas serão ignoradas.`,
         )
+      }
     } finally {
       if (reviewStarted && !reviewCompleted)
         await supabase.rpc("reset_chapter_version_review", { target_version_id: versionId })
@@ -1170,62 +1181,85 @@ export default function EditorialPanel({ chapterId, messages }: Props) {
                 ) : (
                   <p className="mt-2 text-sm text-[#65735f]">Nenhuma versão criada.</p>
                 )}
-                {visibleSuggestions.length ? (
-                  <div className="mt-3 space-y-2">
-                    <label className="flex items-center gap-2 text-xs text-[#65735f]">
-                      Mostrar sugestões de{" "}
-                      <select
-                        value={suggestionVersionFilter}
-                        onChange={(event) => setSuggestionVersionFilter(event.target.value)}
-                        className="rounded-lg border border-[#d9cfc3] bg-white px-2 py-1"
-                      >
-                        <option value="latest">
-                          V{versions[0]?.version_number ?? "mais recente"}
-                        </option>
-                        <option value="all">Todas as versões</option>
-                        {versions.map((version) => (
-                          <option key={`filter-${version.id}`} value={version.id}>
-                            V{version.version_number}
+                {visibleSuggestions.length && currentSuggestion ? (
+                  <div className="mt-3 space-y-3">
+                    <div className="flex items-center justify-between gap-2">
+                      <label className="flex items-center gap-2 text-xs text-[#65735f]">
+                        Mostrar sugestões de{" "}
+                        <select
+                          value={suggestionVersionFilter}
+                          onChange={(event) => {
+                            setSuggestionVersionFilter(event.target.value)
+                            setSuggestionIndex(0)
+                          }}
+                          className="rounded-lg border border-[#d9cfc3] bg-white px-2 py-1"
+                        >
+                          <option value="latest">
+                            V{versions[0]?.version_number ?? "mais recente"}
                           </option>
-                        ))}
-                      </select>
-                      <span>({visibleSuggestions.length} únicas)</span>
-                    </label>
-                    {visibleSuggestions.map((suggestion) => (
+                          <option value="all">Todas as versões</option>
+                          {versions.map((version) => (
+                            <option key={`filter-${version.id}`} value={version.id}>
+                              V{version.version_number}
+                            </option>
+                          ))}
+                        </select>
+                      </label>
+                      <span className="shrink-0 text-xs text-[#65735f]">
+                        {activeSuggestionIndex + 1} de {visibleSuggestions.length}
+                      </span>
+                    </div>
+                    <div className="flex items-stretch gap-2">
+                      <button
+                        type="button"
+                        onClick={() =>
+                          setSuggestionIndex(
+                            activeSuggestionIndex > 0
+                              ? activeSuggestionIndex - 1
+                              : visibleSuggestions.length - 1,
+                          )
+                        }
+                        className="w-8 shrink-0 rounded-lg border border-[#d9cfc3] bg-white text-lg text-[#65735f] transition hover:border-[#65735f] disabled:cursor-not-allowed disabled:opacity-40"
+                        aria-label="Sugestão anterior"
+                        disabled={visibleSuggestions.length < 2}
+                      >
+                        ←
+                      </button>
                       <article
-                        key={suggestion.id}
-                        className="rounded-lg border border-[#e3d8cc] bg-[#f8f3ec] p-3 text-sm"
+                        key={currentSuggestion.id}
+                        className="min-w-0 flex-1 rounded-lg border border-[#e3d8cc] bg-[#f8f3ec] p-3 text-sm"
+                        aria-live="polite"
                       >
                         <div className="flex items-center justify-between gap-2">
-                          <strong>{suggestionTypeLabel(suggestion.suggestion_type)}</strong>
-                          <span className="text-xs text-[#65735f]">
-                            {suggestionSeverityLabel(suggestion.severity)} ·{" "}
-                            {suggestionStatusLabel(suggestion.status)}
+                          <strong>{suggestionTypeLabel(currentSuggestion.suggestion_type)}</strong>
+                          <span className="text-right text-xs text-[#65735f]">
+                            {suggestionSeverityLabel(currentSuggestion.severity)} ·{" "}
+                            {suggestionStatusLabel(currentSuggestion.status)}
                           </span>
                         </div>
-                        <p className="mt-1 text-[#253126]">{suggestion.explanation}</p>
-                        {suggestion.original_text && (
+                        <p className="mt-1 text-[#253126]">{currentSuggestion.explanation}</p>
+                        {currentSuggestion.original_text && (
                           <p className="mt-2 whitespace-pre-wrap text-xs text-[#7b302b]">
-                            Fonte: {suggestion.original_text}
+                            Fonte: {currentSuggestion.original_text}
                           </p>
                         )}
-                        {suggestion.suggested_text && (
+                        {currentSuggestion.suggested_text && (
                           <p className="mt-1 whitespace-pre-wrap text-xs text-[#36552d]">
-                            Proposta: {suggestion.suggested_text}
+                            Proposta: {currentSuggestion.suggested_text}
                           </p>
                         )}
-                        {suggestion.status === "pending" && (
+                        {currentSuggestion.status === "pending" && (
                           <div className="mt-2 flex gap-2">
                             <button
                               type="button"
-                              onClick={() => void acceptSuggestion(suggestion)}
+                              onClick={() => void acceptSuggestion(currentSuggestion)}
                               className="text-xs font-semibold text-[#36552d]"
                             >
                               Aceitar proposta
                             </button>
                             <button
                               type="button"
-                              onClick={() => void rejectSuggestion(suggestion.id)}
+                              onClick={() => void rejectSuggestion(currentSuggestion.id)}
                               className="text-xs font-semibold text-[#7b302b]"
                             >
                               Rejeitar proposta
@@ -1233,7 +1267,41 @@ export default function EditorialPanel({ chapterId, messages }: Props) {
                           </div>
                         )}
                       </article>
-                    ))}
+                      <button
+                        type="button"
+                        onClick={() =>
+                          setSuggestionIndex(
+                            activeSuggestionIndex < visibleSuggestions.length - 1
+                              ? activeSuggestionIndex + 1
+                              : 0,
+                          )
+                        }
+                        className="w-8 shrink-0 rounded-lg border border-[#d9cfc3] bg-white text-lg text-[#65735f] transition hover:border-[#65735f] disabled:cursor-not-allowed disabled:opacity-40"
+                        aria-label="Próxima sugestão"
+                        disabled={visibleSuggestions.length < 2}
+                      >
+                        →
+                      </button>
+                    </div>
+                    <div
+                      className="flex justify-center gap-1.5"
+                      aria-label="Navegação das sugestões"
+                    >
+                      {visibleSuggestions.map((suggestion, index) => (
+                        <button
+                          key={`dot-${suggestion.id}`}
+                          type="button"
+                          onClick={() => setSuggestionIndex(index)}
+                          className={`h-2 w-2 rounded-full transition ${
+                            index === activeSuggestionIndex
+                              ? "bg-[#65735f]"
+                              : "bg-[#d9cfc3] hover:bg-[#a9b1a1]"
+                          }`}
+                          aria-label={`Ir para a sugestão ${index + 1}`}
+                          aria-current={index === activeSuggestionIndex ? "true" : undefined}
+                        />
+                      ))}
+                    </div>
                   </div>
                 ) : (
                   <p className="mt-2 text-sm text-[#65735f]">
