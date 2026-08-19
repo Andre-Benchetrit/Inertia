@@ -1,11 +1,21 @@
 "use client"
 
 import { useCallback, useEffect, useMemo, useRef, useState } from "react"
+import {
+  buildCompilePrompt,
+  checkOllamaModel,
+  compileManuscript,
+  reviewBlockLocal,
+  splitIntoBlocks,
+  suggestionKeyBrowser,
+  type ReviewSuggestion,
+} from "@/lib/ollama-browser"
 import { createSupabaseBrowserClient } from "@/lib/supabase-browser"
 import { WattpadPreview } from "@/lib/wattpad-markdown"
 
 type SourceMessage = {
   id: string
+  author_id?: string
   content: string | null
   message_type: "story" | "author_note"
   sequence_number: number
@@ -47,13 +57,6 @@ type AppliedChange = {
   originalText: string
   suggestedText: string
 }
-type HealthData = {
-  ok?: boolean
-  modelAvailable?: boolean
-  modelWarning?: string | null
-  error?: string
-}
-
 const stageLabels = {
   idle: "",
   checking: "Verificando Ollama...",
@@ -61,23 +64,6 @@ const stageLabels = {
   waiting: "Compilando com IA (pode levar alguns minutos)...",
   saving: "Salvando versão...",
 } as const
-
-function normalizeText(value: string | null | undefined) {
-  return String(value ?? "")
-    .normalize("NFKC")
-    .replace(/\r\n?/g, "\n")
-    .replace(/\s+/g, " ")
-    .trim()
-    .toLocaleLowerCase("pt-BR")
-}
-
-function suggestionKey(
-  item: Pick<Suggestion, "suggestion_type" | "original_text" | "suggested_text" | "anchor">,
-) {
-  const original = normalizeText(item.original_text)
-  const suggested = normalizeText(item.suggested_text)
-  return [item.suggestion_type, original || normalizeText(item.anchor), suggested].join("|")
-}
 
 function findFlexibleRange(text: string, needle: string) {
   const source = text.replace(/\r\n?/g, "\n")
@@ -274,7 +260,7 @@ export default function EditorialPanel({ chapterId, messages }: Props) {
     )
     const seen = new Set<string>()
     return candidates.filter((suggestion) => {
-      const key = suggestionKey(suggestion)
+      const key = suggestionKeyBrowser(suggestion)
       if (seen.has(key)) return false
       seen.add(key)
       return true
@@ -403,37 +389,80 @@ export default function EditorialPanel({ chapterId, messages }: Props) {
     setNotice("")
     setOllamaCheck("")
     try {
-      const healthResponse = await fetch(
-        `/api/ollama/health?model=${encodeURIComponent(activeModel)}`,
-        { cache: "no-store" },
-      )
-      const healthData = (await healthResponse.json().catch(() => ({}))) as HealthData
-      if (!healthResponse.ok || !healthData.ok)
+      const modelCheck = await checkOllamaModel(activeModel)
+      if (!modelCheck.ok)
         throw new Error(
-          healthData.error ??
+          modelCheck.error ??
             "Ollama não está acessível. Verifique se ele está rodando em localhost:11434.",
         )
-      if (!healthData.modelAvailable)
+      if (!modelCheck.modelAvailable)
         throw new Error(
           `Ollama está acessível, mas o modelo "${activeModel}" não foi encontrado. Execute: ollama pull ${activeModel}`,
         )
-      if (healthData.modelWarning) throw new Error(healthData.modelWarning)
+      if (modelCheck.modelWarning) throw new Error(modelCheck.modelWarning)
 
       setOllamaCheck(`Conexão confirmada: ${activeModel} disponível em localhost:11434.`)
       setCompileProgress(18)
       setCompileStage("sending")
-      await new Promise((resolve) => window.setTimeout(resolve, 150))
+      const { data: sourceRows, error: sourceError } = await supabase.rpc("get_chapter_messages", {
+        target_chapter_id: chapterId,
+      })
+      if (sourceError) throw new Error(`Não foi possível ler a Fonte: ${sourceError.message}`)
+
+      const source = ((sourceRows ?? []) as SourceMessage[])
+        .filter(
+          (row: SourceMessage) =>
+            row.message_type === "story" &&
+            row.content &&
+            row.content.trim() &&
+            !row.content.trim().startsWith("Mensagem removida"),
+        )
+        .map((row: SourceMessage) => ({
+          id: row.id,
+          author_id: row.author_id,
+          sequence_number: row.sequence_number,
+          created_at: row.created_at,
+          content: row.content!.trim(),
+        }))
+        .sort((left, right) => left.sequence_number - right.sequence_number)
+      if (!source.length) throw new Error("Não há conteúdo de História para compilar")
+
+      const sourceText = source
+        .map((row) => row.content)
+        .join("\n\n")
+        .slice(0, 180000)
+      const outputTokens = Math.min(2048, Math.max(512, Math.ceil(sourceText.length / 3)))
       setCompileProgress(30)
       setCompileStage("waiting")
-      const response = await fetch("/api/ollama/compile", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ chapterId, model: activeModel }),
-      })
+      const generated = await compileManuscript(
+        activeModel,
+        buildCompilePrompt(sourceText),
+        outputTokens,
+      )
+      if (generated.done_reason === "length")
+        throw new Error(
+          "O Ollama atingiu o limite de saída antes de concluir o manuscrito. Reduza o tamanho da Fonte ou tente novamente com um modelo mais rápido. Nenhuma versão parcial foi salva.",
+        )
+      const content = generated.response?.trim()
+      if (!content) throw new Error("Ollama não retornou um manuscrito")
+
       setCompileProgress(82)
       setCompileStage("saving")
-      const data = await response.json().catch(() => ({}))
-      if (!response.ok) throw new Error(data.error ?? "Não foi possível compilar.")
+      const { error: versionError } = await supabase.rpc("create_chapter_version", {
+        target_chapter_id: chapterId,
+        version_content: content,
+        version_source_snapshot: source.map((row) => ({
+          message_id: row.id,
+          author_id: row.author_id,
+          sequence_number: row.sequence_number,
+          created_at: row.created_at,
+          content: row.content,
+        })),
+        version_provider: "ollama",
+        version_model: activeModel,
+        version_prompt: "compile-chapter-v3-wattpad-markdown",
+      })
+      if (versionError) throw new Error(versionError.message)
 
       setCompileProgress(100)
       setNotice("Nova versão compilada com formatação editorial, sem alterar a Fonte.")
@@ -475,6 +504,8 @@ export default function EditorialPanel({ chapterId, messages }: Props) {
     setReviewStage("Preparando a revisão da versão...")
     setError("")
     setNotice("")
+    let reviewStarted = false
+    let reviewCompleted = false
     const timer = window.setInterval(
       () =>
         setReviewStage((current) =>
@@ -483,24 +514,132 @@ export default function EditorialPanel({ chapterId, messages }: Props) {
       700,
     )
     try {
+      const { data: version, error: versionError } = await supabase
+        .from("chapter_versions")
+        .select("id,chapter_id,content,review_status")
+        .eq("id", versionId)
+        .eq("chapter_id", chapterId)
+        .maybeSingle()
+      if (versionError) throw new Error(versionError.message)
+      if (!version) throw new Error("Versão não encontrada")
+      if (version.review_status === "completed")
+        throw new Error(
+          "Esta versão já recebeu uma revisão. Crie uma nova versão para revisar novamente.",
+        )
+
+      const { data: chapter, error: chapterError } = await supabase
+        .from("chapters")
+        .select("book_id")
+        .eq("id", chapterId)
+        .maybeSingle()
+      if (chapterError) throw new Error(chapterError.message)
+      if (!chapter?.book_id) throw new Error("Capítulo não encontrado")
+
+      const { data: book, error: bookError } = await supabase
+        .from("books")
+        .select("title,description")
+        .eq("id", chapter.book_id)
+        .maybeSingle()
+      if (bookError) throw new Error(bookError.message)
+      const storyContext = [
+        book?.title ? `Título: ${book.title}` : "",
+        book?.description ? `Descrição e possível gênero: ${book.description}` : "",
+      ]
+        .filter(Boolean)
+        .join("\n")
+
+      const { data: startData, error: startError } = await supabase.rpc(
+        "start_chapter_version_review",
+        { target_version_id: versionId, requested_model: activeModel },
+      )
+      if (startError)
+        throw new Error(
+          `Não foi possível iniciar o controle de revisão desta versão. Aplique a migration 0007_review_runs.sql no Supabase. Detalhe: ${startError.message}`,
+        )
+      const started = (Array.isArray(startData) ? startData[0] : startData) as {
+        acquired?: boolean
+        review_status?: string
+      } | null
+      if (!started?.acquired) {
+        if (started?.review_status === "completed")
+          throw new Error(
+            "Esta versão já recebeu uma revisão. Crie uma nova versão para revisar novamente.",
+          )
+        throw new Error(
+          "Esta versão já está sendo revisada. Aguarde a conclusão antes de tentar novamente.",
+        )
+      }
+      reviewStarted = true
+
       setReviewStage("Dividindo o Manuscrito em blocos...")
       await new Promise((resolve) => window.setTimeout(resolve, 250))
-      setReviewStage("A IA está revisando os blocos...")
-      const response = await fetch("/api/ollama/review", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ chapterId, versionId, model: activeModel }),
-      })
-      const data = await response.json().catch(() => ({}))
-      if (!response.ok) throw new Error(data.error ?? "Não foi possível revisar.")
+      const blocks = splitIntoBlocks(String(version.content).slice(0, 180000))
+      const generated: ReviewSuggestion[] = []
+      for (let index = 0; index < blocks.length; index += 1) {
+        setReviewStage(`A IA está revisando o bloco ${index + 1} de ${blocks.length}...`)
+        const result = await reviewBlockLocal(
+          activeModel,
+          blocks[index],
+          index + 1,
+          blocks.length,
+          storyContext,
+        )
+        generated.push(...result.suggestions)
+      }
+
       setReviewStage("Consolidando sugestões...")
+      const { data: existing, error: existingError } = await supabase
+        .from("chapter_suggestions")
+        .select("suggestion_type,original_text,suggested_text,anchor")
+        .eq("chapter_id", chapterId)
+        .eq("version_id", versionId)
+      if (existingError) throw new Error(existingError.message)
+
+      const seen = new Set(
+        (existing ?? []).map((item) => suggestionKeyBrowser(item as ReviewSuggestion)),
+      )
+      const unique = generated.filter((item) => {
+        const key = suggestionKeyBrowser(item)
+        if (seen.has(key)) return false
+        seen.add(key)
+        return true
+      })
+      const { data: userResult } = await supabase.auth.getUser()
+      if (!userResult.user)
+        throw new Error("Sessão expirada. Entre novamente para salvar a revisão.")
+
+      if (unique.length) {
+        const { error: insertError } = await supabase.from("chapter_suggestions").insert(
+          unique.map((item) => ({
+            ...item,
+            chapter_id: chapterId,
+            version_id: versionId,
+            created_by: userResult.user.id,
+          })),
+        )
+        if (insertError) throw new Error(insertError.message)
+      }
+
+      const { error: completeError } = await supabase.rpc("complete_chapter_version_review", {
+        target_version_id: versionId,
+        processed_blocks: blocks.length,
+        saved_suggestions: unique.length,
+        requested_model: activeModel,
+      })
+      if (completeError)
+        throw new Error(
+          `As sugestões foram processadas, mas não foi possível concluir o estado da revisão. ${completeError.message}`,
+        )
+      reviewCompleted = true
       setNotice(
-        `Revisão concluída: ${data.blocks_processed ?? 0} bloco(s), ${(data.suggestions ?? []).length} sugestão(ões) nova(s).`,
+        `Revisão concluída: ${blocks.length} bloco(s), ${unique.length} sugestão(ões) nova(s).`,
       )
       await loadEditorial()
     } catch (caught) {
       setError(caught instanceof Error ? caught.message : "Falha desconhecida durante a revisão.")
     } finally {
+      if (reviewStarted && !reviewCompleted)
+        await supabase.rpc("reset_chapter_version_review", { target_version_id: versionId })
       window.clearInterval(timer)
       setReviewing(false)
       setReviewStage("")

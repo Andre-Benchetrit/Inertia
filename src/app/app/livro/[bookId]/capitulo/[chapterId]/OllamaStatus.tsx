@@ -1,7 +1,12 @@
 "use client"
 
 import { useCallback, useEffect, useState } from "react"
-import type { OllamaModel, OllamaStatus as OllamaStatusValue } from "@/lib/ollama-browser"
+import {
+  checkOllamaModel,
+  getOllamaStatus,
+  type OllamaModel,
+  type OllamaStatus as OllamaStatusValue,
+} from "@/lib/ollama-browser"
 
 export default function OllamaStatus() {
   const [status, setStatus] = useState<OllamaStatusValue>({ available: false, models: [] })
@@ -19,42 +24,41 @@ export default function OllamaStatus() {
     if (showMessage) setConnectionMessage("")
     try {
       const storedModel = window.localStorage.getItem("inertia:ollama:model") ?? ""
-      const query = storedModel ? `?model=${encodeURIComponent(storedModel)}` : ""
-      const response = await fetch(`/api/ollama/health${query}`, { cache: "no-store" })
-      const data = (await response.json().catch(() => ({}))) as {
-        ok?: boolean
-        models?: string[]
-        modelAvailable?: boolean
-        modelWarning?: string | null
-        error?: string
-      }
-      const models: OllamaModel[] = (data.models ?? []).map((name) => ({ name }))
-      const next = { available: Boolean(response.ok && data.ok), models, error: data.error }
-      setStatus(next)
+      const baseStatus = await getOllamaStatus()
+      const models = baseStatus.models
       const nextModel =
-        storedModel ||
+        (storedModel && models.some((item) => item.name === storedModel) ? storedModel : "") ||
         models.find((item) => /instruct/i.test(item.name))?.name ||
         models[0]?.name ||
         ""
+      const modelCheck = nextModel
+        ? await checkOllamaModel(nextModel)
+        : { modelAvailable: false, modelWarning: null, recommendedModel: null }
+      const next = {
+        ...baseStatus,
+        modelAvailable: modelCheck.modelAvailable,
+        modelWarning: modelCheck.modelWarning,
+        recommendedModel: modelCheck.recommendedModel,
+      }
+      setStatus(next)
       setSelectedModel(nextModel)
-      if (nextModel && !storedModel) window.localStorage.setItem("inertia:ollama:model", nextModel)
+      if (nextModel && nextModel !== storedModel)
+        window.localStorage.setItem("inertia:ollama:model", nextModel)
       if (showMessage) {
         setConnectionMessage(
           next.available
-            ? (data.modelWarning ??
-                (data.modelAvailable
-                  ? `Conex\u00e3o confirmada: ${nextModel} dispon\u00edvel em localhost:11434.`
-                  : "Ollama acess\u00edvel, mas o modelo escolhido n\u00e3o foi encontrado."))
-            : (data.error ?? "Ollama n\u00e3o est\u00e1 acess\u00edvel em localhost:11434."),
+            ? (next.modelWarning ??
+                (nextModel && next.modelAvailable
+                  ? `Conexão confirmada: ${nextModel} disponível em localhost:11434.`
+                  : "Ollama acessível, mas o modelo escolhido não foi encontrado."))
+            : (next.error ?? "Ollama não está acessível em localhost:11434."),
         )
       }
     } catch (error) {
-      const message = error instanceof Error ? error.message : "Falha ao testar a conex\u00e3o."
+      const message = error instanceof Error ? error.message : "Falha ao testar a conexão."
       setStatus({ available: false, models: [], error: message })
       if (showMessage)
-        setConnectionMessage(
-          `Ollama n\u00e3o est\u00e1 acess\u00edvel em localhost:11434. ${message}`,
-        )
+        setConnectionMessage(`Ollama não está acessível em localhost:11434. ${message}`)
     } finally {
       setChecking(false)
     }
@@ -71,6 +75,7 @@ export default function OllamaStatus() {
     setSelectedModel(model.name)
     window.localStorage.setItem("inertia:ollama:model", model.name)
     setConnectionMessage("")
+    void refresh()
   }
 
   const label = !status.available
