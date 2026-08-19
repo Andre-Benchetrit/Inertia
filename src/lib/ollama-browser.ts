@@ -62,6 +62,10 @@ const MAX_SOURCE_CHARS = 180000
 const REVIEW_BLOCK_CHARS = 9000
 const REVIEW_MAX_SUGGESTIONS_PER_BLOCK = 4
 const REVIEW_OUTPUT_TOKENS = 2048
+const REVIEW_BLOCK_TIMEOUT_MS = 180000
+const COMPILE_BLOCK_CHARS = 9000
+const COMPILE_BLOCK_OUTPUT_TOKENS = 4096
+const COMPILE_BLOCK_TIMEOUT_MS = 180000
 
 async function request<T>(
   path: string,
@@ -143,22 +147,6 @@ export async function checkOllamaModel(model: string): Promise<OllamaModelCheck>
   }
 }
 
-function normalizeCompileSource(rows: CompileSourceRow[]) {
-  return rows
-    .filter(
-      (row) =>
-        row.message_type === "story" && row.content && row.content.trim() && row.content.trim(),
-    )
-    .map((row) => ({
-      id: row.id,
-      author_id: row.author_id,
-      sequence_number: row.sequence_number,
-      created_at: row.created_at,
-      content: row.content!.trim(),
-    }))
-    .sort((left, right) => left.sequence_number - right.sequence_number)
-}
-
 export function buildCompilePrompt(sourceText: string) {
   return `Você é um editor de ficção e formatador editorial para leitura em estilo Wattpad. Compile apenas o conteúdo de História abaixo, preservando fatos, voz, ordem e intenção. Não invente acontecimentos, personagens, lugares ou diálogos; não acrescente informações e não inclua Comentários dos autores. Retorne somente o manuscrito final em Markdown editorial, sem análise, prefácio, rótulos ou bloco de código.
 
@@ -193,6 +181,78 @@ export async function compileManuscript(model: string, prompt: string, outputTok
 }
 
 export const compileWithOllamaLocal = compileManuscript
+
+export type CompileBlockProgress = {
+  block: number
+  totalBlocks: number
+  content: string
+}
+
+export function buildCompileBlockPrompt(
+  block: string,
+  blockNumber: number,
+  totalBlocks: number,
+  previousTail: string,
+) {
+  const continuity = previousTail
+    ? `Use o final do bloco anterior apenas para manter continuidade de voz, cena e parágrafo. Não repita esse trecho na resposta.\n\nFINAL DO BLOCO ANTERIOR:\n${previousTail}`
+    : "Este é o primeiro bloco. Comece diretamente pelo texto editorial, sem prefácio."
+
+  return `Você é um editor de ficção e formatador editorial para leitura em estilo Wattpad. Compile somente este bloco da História, preservando fatos, voz, ordem e intenção. Não invente acontecimentos, personagens, lugares ou diálogos; não acrescente informações e não inclua Comentários dos autores. Retorne somente o bloco compilado em Markdown editorial, sem análise, prefácio, rótulos ou bloco de código.
+
+Este é o bloco ${blockNumber} de ${totalBlocks}. ${continuity}
+
+Regras de formatação:
+- Separe todos os parágrafos com uma linha em branco. Una mensagens que forem continuação da mesma frase ou parágrafo e crie uma nova quebra quando houver mudança real de ideia, cena ou ritmo.
+- Coloque cada fala ou bloco de diálogo em seu próprio parágrafo, preservando o sentido e a voz.
+- Não carregue números de sequência das mensagens para a resposta.
+- Não crie um título de capítulo em blocos posteriores. Use ## somente no primeiro bloco, se houver base suficiente, ou para uma mudança clara de cena que realmente comporte um título de seção. Não repita títulos.
+- Use **negrito** com moderação para uma ênfase narrativa realmente forte e *itálico* para pensamentos, palavras estrangeiras ou uma ênfase leve. Não formate cada frase.
+- Use --- apenas para uma mudança clara de cena.
+- Nunca use HTML, links, emojis, listas ou comentários sobre o próprio processo.
+- Preserve a continuidade com o final do bloco anterior e não recapitule acontecimentos já apresentados.
+
+BLOCO DA FONTE:
+${block}`
+}
+
+export async function compileBlockLocal(
+  model: string,
+  block: string,
+  blockNumber: number,
+  totalBlocks: number,
+  previousTail: string,
+): Promise<{ response?: string; done_reason?: string }> {
+  const raw = await request<{ response?: string; done_reason?: string }>(
+    "/api/generate",
+    {
+      method: "POST",
+      body: JSON.stringify({
+        model,
+        prompt: buildCompileBlockPrompt(block, blockNumber, totalBlocks, previousTail),
+        stream: false,
+        think: false,
+        options: { num_predict: COMPILE_BLOCK_OUTPUT_TOKENS, temperature: 0.2 },
+      }),
+    },
+    COMPILE_BLOCK_TIMEOUT_MS,
+  )
+
+  if (raw.done_reason === "length")
+    throw new OllamaError(
+      `O Ollama atingiu o limite de saída ao compilar o bloco ${blockNumber} de ${totalBlocks}. O bloco não foi salvo.`,
+      "OLLAMA_OUTPUT_LIMIT",
+    )
+
+  const response = raw.response?.trim()
+  if (!response)
+    throw new OllamaError(
+      `O Ollama não retornou conteúdo para o bloco ${blockNumber} de ${totalBlocks}.`,
+      "OLLAMA_EMPTY_RESPONSE",
+    )
+
+  return { response, done_reason: raw.done_reason }
+}
 
 function normalizePart(value: string | null | undefined) {
   return String(value ?? "")
@@ -305,7 +365,7 @@ export async function reviewBlockLocal(
         options: { num_predict: REVIEW_OUTPUT_TOKENS, temperature: 0.2 },
       }),
     },
-    60000,
+    REVIEW_BLOCK_TIMEOUT_MS,
   )
 
   if (raw.done_reason === "length")

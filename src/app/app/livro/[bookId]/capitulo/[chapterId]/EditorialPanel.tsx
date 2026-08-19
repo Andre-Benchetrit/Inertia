@@ -2,9 +2,8 @@
 
 import { useCallback, useEffect, useMemo, useRef, useState } from "react"
 import {
-  buildCompilePrompt,
   checkOllamaModel,
-  compileManuscript,
+  compileBlockLocal,
   reviewBlockLocal,
   splitIntoBlocks,
   suggestionKeyBrowser,
@@ -57,6 +56,71 @@ type AppliedChange = {
   originalText: string
   suggestedText: string
 }
+type CompileCheckpoint = {
+  version: 1
+  model: string
+  sourceSignature: string
+  fragments: string[]
+  updatedAt: string
+}
+const COMPILE_CHECKPOINT_VERSION = 1
+
+function compileCheckpointKey(chapterId: string) {
+  return `inertia:compile-checkpoint:${chapterId}`
+}
+
+function compileSourceSignature(sourceText: string) {
+  return `${sourceText.length}:${sourceText.slice(0, 160)}:${sourceText.slice(-160)}`
+}
+
+function readCompileCheckpoint(chapterId: string): CompileCheckpoint | null {
+  if (typeof window === "undefined") return null
+  try {
+    const raw = window.localStorage.getItem(compileCheckpointKey(chapterId))
+    if (!raw) return null
+    const value = JSON.parse(raw) as Partial<CompileCheckpoint>
+    if (
+      value.version !== COMPILE_CHECKPOINT_VERSION ||
+      typeof value.model !== "string" ||
+      typeof value.sourceSignature !== "string" ||
+      !Array.isArray(value.fragments) ||
+      value.fragments.some((fragment) => typeof fragment !== "string")
+    )
+      return null
+    return value as CompileCheckpoint
+  } catch {
+    return null
+  }
+}
+
+function writeCompileCheckpoint(
+  chapterId: string,
+  checkpoint: Omit<CompileCheckpoint, "version" | "updatedAt">,
+) {
+  if (typeof window === "undefined") return
+  try {
+    window.localStorage.setItem(
+      compileCheckpointKey(chapterId),
+      JSON.stringify({
+        ...checkpoint,
+        version: COMPILE_CHECKPOINT_VERSION,
+        updatedAt: new Date().toISOString(),
+      }),
+    )
+  } catch {
+    // A full localStorage must not invalidate a compilation that is still running.
+  }
+}
+
+function clearCompileCheckpoint(chapterId: string) {
+  if (typeof window === "undefined") return
+  try {
+    window.localStorage.removeItem(compileCheckpointKey(chapterId))
+  } catch {
+    // Ignore storage cleanup failures after a successful compilation.
+  }
+}
+
 const stageLabels = {
   idle: "",
   checking: "Verificando Ollama...",
@@ -431,22 +495,63 @@ export default function EditorialPanel({ chapterId, messages }: Props) {
         .map((row) => row.content)
         .join("\n\n")
         .slice(0, 180000)
-      const outputTokens = Math.min(2048, Math.max(512, Math.ceil(sourceText.length / 3)))
-      setCompileProgress(30)
-      setCompileStage("waiting")
-      const generated = await compileManuscript(
-        activeModel,
-        buildCompilePrompt(sourceText),
-        outputTokens,
+      const blocks = splitIntoBlocks(sourceText)
+      const sourceSignature = compileSourceSignature(sourceText)
+      const previousCheckpoint = readCompileCheckpoint(chapterId)
+      const canResume = Boolean(
+        previousCheckpoint &&
+          previousCheckpoint.model === activeModel &&
+          previousCheckpoint.sourceSignature === sourceSignature &&
+          previousCheckpoint.fragments.length > 0 &&
+          previousCheckpoint.fragments.length <= blocks.length,
       )
-      if (generated.done_reason === "length")
-        throw new Error(
-          "O Ollama atingiu o limite de saída antes de concluir o manuscrito. Reduza o tamanho da Fonte ou tente novamente com um modelo mais rápido. Nenhuma versão parcial foi salva.",
+      const fragments = canResume ? [...(previousCheckpoint?.fragments ?? [])] : []
+      if (canResume) {
+        setNotice(
+          fragments.length < blocks.length
+            ? `Retomando a compilação a partir do bloco ${fragments.length + 1} de ${blocks.length}. Os fragmentos anteriores estão preservados localmente.`
+            : "Todos os blocos já foram compilados. Retomando o salvamento da versão final.",
         )
-      const content = generated.response?.trim()
+      } else {
+        clearCompileCheckpoint(chapterId)
+      }
+
+      for (let index = fragments.length; index < blocks.length; index += 1) {
+        const blockNumber = index + 1
+        const progress = 30 + Math.round((index / blocks.length) * 55)
+        setCompileProgress(progress)
+        setCompileStage("waiting")
+        const previousContent = fragments[fragments.length - 1] ?? ""
+        const previousTail = previousContent.slice(-1600)
+        let generated
+        try {
+          generated = await compileBlockLocal(
+            activeModel,
+            blocks[index],
+            blockNumber,
+            blocks.length,
+            previousTail,
+          )
+        } catch (caught) {
+          throw new Error(
+            `${caught instanceof Error ? caught.message : "Falha desconhecida no Ollama."} A compilação foi interrompida no bloco ${blockNumber} de ${blocks.length}; os blocos anteriores foram preservados para retomada.`,
+          )
+        }
+        const fragment = generated.response?.trim()
+        if (!fragment) throw new Error(`Ollama não retornou conteúdo para o bloco ${blockNumber}.`)
+        fragments.push(fragment)
+        writeCompileCheckpoint(chapterId, {
+          model: activeModel,
+          sourceSignature,
+          fragments,
+        })
+        setCompileProgress(30 + Math.round((blockNumber / blocks.length) * 55))
+      }
+
+      const content = fragments.join("\n\n").trim()
       if (!content) throw new Error("Ollama não retornou um manuscrito")
 
-      setCompileProgress(82)
+      setCompileProgress(88)
       setCompileStage("saving")
       const { error: versionError } = await supabase.rpc("create_chapter_version", {
         target_chapter_id: chapterId,
@@ -460,10 +565,11 @@ export default function EditorialPanel({ chapterId, messages }: Props) {
         })),
         version_provider: "ollama",
         version_model: activeModel,
-        version_prompt: "compile-chapter-v3-wattpad-markdown",
+        version_prompt: "compile-chapter-v4-wattpad-blocks",
       })
       if (versionError) throw new Error(versionError.message)
 
+      clearCompileCheckpoint(chapterId)
       setCompileProgress(100)
       setNotice("Nova versão compilada com formatação editorial, sem alterar a Fonte.")
       await loadEditorial()
@@ -506,6 +612,8 @@ export default function EditorialPanel({ chapterId, messages }: Props) {
     setNotice("")
     let reviewStarted = false
     let reviewCompleted = false
+    let processedBlocks = 0
+    let savedSuggestionCount = 0
     const timer = window.setInterval(
       () =>
         setReviewStage((current) =>
@@ -571,10 +679,23 @@ export default function EditorialPanel({ chapterId, messages }: Props) {
       }
       reviewStarted = true
 
+      const { data: existing, error: existingError } = await supabase
+        .from("chapter_suggestions")
+        .select("suggestion_type,original_text,suggested_text,anchor")
+        .eq("chapter_id", chapterId)
+        .eq("version_id", versionId)
+      if (existingError) throw new Error(existingError.message)
+      const seen = new Set(
+        (existing ?? []).map((item) => suggestionKeyBrowser(item as ReviewSuggestion)),
+      )
+      let totalSuggestionCount = existing?.length ?? 0
+      const { data: userResult } = await supabase.auth.getUser()
+      if (!userResult.user)
+        throw new Error("Sessão expirada. Entre novamente para salvar a revisão.")
+
       setReviewStage("Dividindo o Manuscrito em blocos...")
       await new Promise((resolve) => window.setTimeout(resolve, 250))
       const blocks = splitIntoBlocks(String(version.content).slice(0, 180000))
-      const generated: ReviewSuggestion[] = []
       for (let index = 0; index < blocks.length; index += 1) {
         setReviewStage(`A IA está revisando o bloco ${index + 1} de ${blocks.length}...`)
         const result = await reviewBlockLocal(
@@ -584,59 +705,63 @@ export default function EditorialPanel({ chapterId, messages }: Props) {
           blocks.length,
           storyContext,
         )
-        generated.push(...result.suggestions)
-      }
+        const unique = result.suggestions.filter((item) => {
+          const key = suggestionKeyBrowser(item)
+          if (seen.has(key)) return false
+          seen.add(key)
+          return true
+        })
 
-      setReviewStage("Consolidando sugestões...")
-      const { data: existing, error: existingError } = await supabase
-        .from("chapter_suggestions")
-        .select("suggestion_type,original_text,suggested_text,anchor")
-        .eq("chapter_id", chapterId)
-        .eq("version_id", versionId)
-      if (existingError) throw new Error(existingError.message)
-
-      const seen = new Set(
-        (existing ?? []).map((item) => suggestionKeyBrowser(item as ReviewSuggestion)),
-      )
-      const unique = generated.filter((item) => {
-        const key = suggestionKeyBrowser(item)
-        if (seen.has(key)) return false
-        seen.add(key)
-        return true
-      })
-      const { data: userResult } = await supabase.auth.getUser()
-      if (!userResult.user)
-        throw new Error("Sessão expirada. Entre novamente para salvar a revisão.")
-
-      if (unique.length) {
-        const { error: insertError } = await supabase.from("chapter_suggestions").insert(
-          unique.map((item) => ({
+        if (unique.length) {
+          const rows = unique.map((item) => ({
             ...item,
             chapter_id: chapterId,
             version_id: versionId,
             created_by: userResult.user.id,
-          })),
+          }))
+          const { data: insertedRows, error: insertError } = await supabase
+            .from("chapter_suggestions")
+            .insert(rows)
+            .select(
+              "id,version_id,suggestion_type,severity,status,explanation,original_text,suggested_text,anchor,created_at",
+            )
+          if (insertError) throw new Error(insertError.message)
+          const insertedCount = insertedRows?.length ?? unique.length
+          savedSuggestionCount += insertedCount
+          totalSuggestionCount += insertedCount
+          if (insertedRows?.length) {
+            setSuggestions((current) => [...(insertedRows as Suggestion[]), ...current])
+          }
+        }
+
+        processedBlocks = index + 1
+        setReviewStage(
+          `Bloco ${processedBlocks} de ${blocks.length} concluído. Progresso salvo; continuando...`,
         )
-        if (insertError) throw new Error(insertError.message)
       }
 
+      setReviewStage("Finalizando a revisão...")
       const { error: completeError } = await supabase.rpc("complete_chapter_version_review", {
         target_version_id: versionId,
-        processed_blocks: blocks.length,
-        saved_suggestions: unique.length,
+        processed_blocks: processedBlocks,
+        saved_suggestions: totalSuggestionCount,
         requested_model: activeModel,
       })
       if (completeError)
         throw new Error(
-          `As sugestões foram processadas, mas não foi possível concluir o estado da revisão. ${completeError.message}`,
+          `As sugestões foram salvas, mas não foi possível concluir o estado da revisão. ${completeError.message}`,
         )
       reviewCompleted = true
       setNotice(
-        `Revisão concluída: ${blocks.length} bloco(s), ${unique.length} sugestão(ões) nova(s).`,
+        `Revisão concluída: ${processedBlocks} bloco(s), ${savedSuggestionCount} sugestão(ões) nova(s).`,
       )
       await loadEditorial()
     } catch (caught) {
       setError(caught instanceof Error ? caught.message : "Falha desconhecida durante a revisão.")
+      if (processedBlocks || savedSuggestionCount)
+        setNotice(
+          `Progresso preservado: ${processedBlocks} bloco(s) processado(s) e ${savedSuggestionCount} sugestão(ões) salva(s). Você pode tentar novamente; sugestões repetidas serão ignoradas.`,
+        )
     } finally {
       if (reviewStarted && !reviewCompleted)
         await supabase.rpc("reset_chapter_version_review", { target_version_id: versionId })
