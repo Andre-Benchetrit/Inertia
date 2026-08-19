@@ -7,7 +7,7 @@ const allowedSeverities = new Set(["low", "medium", "high"])
 const REVIEW_BLOCK_CHARS = 9000
 const REVIEW_MAX_SUGGESTIONS_PER_BLOCK = 4
 const REVIEW_OUTPUT_TOKENS = 2048
-const REVIEW_BLOCK_TIMEOUT_MS = 60000
+const REVIEW_BLOCK_TIMEOUT_MS = 180000
 
 type ReviewSuggestion = {
   suggestion_type: string
@@ -138,7 +138,7 @@ ${block}`
       ok: false,
       code: isTimeout ? "OLLAMA_REVIEW_BLOCK_TIMEOUT" : "OLLAMA_UNREACHABLE",
       error: isTimeout
-        ? `O Ollama demorou mais de 60 segundos para revisar o bloco ${blockNumber} de ${totalBlocks}. Reduza o tamanho da Fonte ou use um modelo mais rápido.`
+        ? `O Ollama demorou mais de 180 segundos para revisar o bloco ${blockNumber} de ${totalBlocks}. Reduza o tamanho da Fonte ou use um modelo mais rápido.`
         : `Não foi possível alcançar o Ollama em ${OLLAMA_URL}. Abra o Ollama e tente novamente.`,
       status: 504,
     }
