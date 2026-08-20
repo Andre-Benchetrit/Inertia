@@ -313,6 +313,86 @@ export default function BookPage() {
       return
     }
 
+    const [
+      entitiesResult,
+      factsResult,
+      relationsResult,
+      eventsResult,
+      eventEntitiesResult,
+      openThreadsResult,
+      openThreadEntitiesResult,
+      chapterMemoryResult,
+      runsResult,
+      proposalsResult,
+    ] = await Promise.all([
+      supabase
+        .from("universe_entities")
+        .select(
+          "id,book_id,name,entity_type,summary,aliases,attributes,visibility,archived_at,created_by,updated_by,created_at,updated_at",
+        )
+        .eq("book_id", bookId),
+      supabase
+        .from("canon_facts")
+        .select(
+          "id,book_id,entity_id,statement,source_kind,source_chapter_id,source_version_id,evidence,visibility,status,archived_at,created_by,updated_by,created_at,updated_at",
+        )
+        .eq("book_id", bookId),
+      supabase
+        .from("universe_relations")
+        .select(
+          "id,book_id,from_entity_id,to_entity_id,relation_type,description,source_kind,source_chapter_id,source_version_id,visibility,archived_at,created_by,updated_by,created_at,updated_at",
+        )
+        .eq("book_id", bookId),
+      supabase
+        .from("timeline_events")
+        .select(
+          "id,book_id,event_kind,title,description,narrative_time,source_kind,source_chapter_id,source_version_id,evidence,visibility,status,archived_at,created_by,updated_by,created_at,updated_at",
+        )
+        .eq("book_id", bookId),
+      supabase.from("timeline_event_entities").select("event_id,entity_id,role,created_at"),
+      supabase
+        .from("open_threads")
+        .select(
+          "id,book_id,title,description,status,priority,source_kind,source_chapter_id,source_version_id,evidence,visibility,archived_at,created_by,updated_by,created_at,updated_at",
+        )
+        .eq("book_id", bookId),
+      supabase.from("open_thread_entities").select("thread_id,entity_id,role,created_at"),
+      supabase
+        .from("chapters")
+        .select("id,approved_version_id,approved_at,approved_by,memory_status")
+        .eq("book_id", bookId),
+      supabase
+        .from("memory_analysis_runs")
+        .select(
+          "id,book_id,chapter_id,version_id,requested_by,model_name,prompt_version,source_hash,status,total_blocks,processed_blocks,error_message,started_at,finished_at,created_at,updated_at",
+        )
+        .eq("book_id", bookId),
+      supabase
+        .from("memory_proposals")
+        .select(
+          "id,run_id,book_id,chapter_id,version_id,proposal_kind,status,confidence,title,payload,evidence,explanation,source_block,source_anchor,reviewed_by,reviewed_at,review_note,created_at,updated_at",
+        )
+        .eq("book_id", bookId),
+    ])
+    const optionalExportErrors = [
+      entitiesResult.error ? `universe_entities: ${entitiesResult.error.message}` : "",
+      factsResult.error ? `canon_facts: ${factsResult.error.message}` : "",
+      relationsResult.error ? `universe_relations: ${relationsResult.error.message}` : "",
+      eventsResult.error ? `timeline_events: ${eventsResult.error.message}` : "",
+      eventEntitiesResult.error
+        ? `timeline_event_entities: ${eventEntitiesResult.error.message}`
+        : "",
+      openThreadsResult.error ? `open_threads: ${openThreadsResult.error.message}` : "",
+      openThreadEntitiesResult.error
+        ? `open_thread_entities: ${openThreadEntitiesResult.error.message}`
+        : "",
+      chapterMemoryResult.error
+        ? `chapters memory status: ${chapterMemoryResult.error.message}`
+        : "",
+      runsResult.error ? `memory_analysis_runs: ${runsResult.error.message}` : "",
+      proposalsResult.error ? `memory_proposals: ${proposalsResult.error.message}` : "",
+    ].filter(Boolean)
+
     const failed = messageResults.find((result) => result.error)
     if (failed?.error) {
       setError("Não foi possível exportar as mensagens: " + failed.error.message)
@@ -322,13 +402,31 @@ export default function BookPage() {
 
     const payload = {
       format: "inertia-book-backup",
-      version: 2,
+      formatVersion: 4,
+      version: 4,
       exported_at: new Date().toISOString(),
       book,
       members: (memberResult.data || []).map((member) => ({
         ...member,
         display_name: names.get(member.user_id) || "Autor",
       })),
+      universe: {
+        entities: entitiesResult.error ? [] : entitiesResult.data || [],
+        facts: factsResult.error ? [] : factsResult.data || [],
+        relations: relationsResult.error ? [] : relationsResult.data || [],
+        events: eventsResult.error ? [] : eventsResult.data || [],
+        event_entities: eventEntitiesResult.error ? [] : eventEntitiesResult.data || [],
+        open_threads: openThreadsResult.error ? [] : openThreadsResult.data || [],
+        open_thread_entities: openThreadEntitiesResult.error
+          ? []
+          : openThreadEntitiesResult.data || [],
+      },
+      memory: {
+        chapter_statuses: chapterMemoryResult.error ? [] : chapterMemoryResult.data || [],
+        analysis_runs: runsResult.error ? [] : runsResult.data || [],
+        proposals: proposalsResult.error ? [] : proposalsResult.data || [],
+      },
+      export_warnings: optionalExportErrors,
       chapters: chapters.map((chapter, index) => {
         const editorial = editorialResults[index]
         return {
@@ -589,7 +687,13 @@ export default function BookPage() {
           </section>
         )}
 
-        <div className="mt-4 flex justify-end">
+        <div className="mt-4 flex flex-wrap justify-end gap-2">
+          <Link
+            href={`/app/livro/${bookId}/universo`}
+            className="rounded-full border border-[#d5c9bd] bg-white/60 px-3 py-1.5 text-xs font-semibold text-[#687065] transition hover:bg-white"
+          >
+            Abrir Universo
+          </Link>
           <button
             type="button"
             onClick={() => void exportBackup()}

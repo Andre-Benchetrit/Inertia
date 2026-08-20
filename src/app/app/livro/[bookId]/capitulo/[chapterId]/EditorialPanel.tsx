@@ -1,12 +1,26 @@
 "use client"
 
+import Link from "next/link"
 import { useCallback, useEffect, useMemo, useRef, useState } from "react"
 import {
+  buildReviewerContext,
   checkOllamaModel,
   compileBlockLocal,
+  extractMemoryBlock,
+  memoryProposalKeyBrowser,
+  mergeMemoryEntityContexts,
+  mergeMemoryProposalsBrowser,
+  MEMORY_BLOCK_CHARS,
   reviewBlockLocal,
   splitIntoBlocks,
   suggestionKeyBrowser,
+  type CanonicalMemoryEntity,
+  type CanonicalMemoryEvent,
+  type CanonicalMemoryFact,
+  type CanonicalMemoryOpenThread,
+  type CanonicalMemoryRelation,
+  type ExistingMemoryEntity,
+  type MemoryProposalRaw,
   type ReviewSuggestion,
 } from "@/lib/ollama-browser"
 import { createSupabaseBrowserClient } from "@/lib/supabase-browser"
@@ -22,6 +36,7 @@ type SourceMessage = {
 }
 type Manuscript = { id: string; content: string; updated_at: string }
 type ReviewStatus = "not_reviewed" | "running" | "completed"
+type MemoryStatus = "never_analyzed" | "current" | "stale"
 type Version = {
   id: string
   version_number: number
@@ -72,6 +87,20 @@ function compileCheckpointKey(chapterId: string) {
 
 function compileSourceSignature(sourceText: string) {
   return `${sourceText.length}:${sourceText.slice(0, 160)}:${sourceText.slice(-160)}`
+}
+
+async function memorySourceHash(sourceText: string) {
+  try {
+    const digest = await window.crypto.subtle.digest(
+      "SHA-256",
+      new TextEncoder().encode(sourceText),
+    )
+    return Array.from(new Uint8Array(digest))
+      .map((byte) => byte.toString(16).padStart(2, "0"))
+      .join("")
+  } catch {
+    return compileSourceSignature(sourceText)
+  }
 }
 
 function readCompileCheckpoint(chapterId: string): CompileCheckpoint | null {
@@ -186,6 +215,12 @@ function reviewStatusLabel(status: ReviewStatus | undefined) {
   return "Ainda não revisada"
 }
 
+function memoryStatusLabel(status: MemoryStatus) {
+  if (status === "current") return "Memória atualizada"
+  if (status === "stale") return "Memória desatualizada"
+  return "Memória ainda não analisada"
+}
+
 function escapeHtml(value: string) {
   return value.replace(/[&<>\"]/g, (character) => {
     if (character === "&") return "&amp;"
@@ -272,6 +307,8 @@ export default function EditorialPanel({ bookId, chapterId, messages }: Props) {
   const [isExpanded, setIsExpanded] = useState(false)
   const [manuscript, setManuscript] = useState<Manuscript | null>(null)
   const [versions, setVersions] = useState<Version[]>([])
+  const [approvedVersionId, setApprovedVersionId] = useState<string | null>(null)
+  const [memoryStatus, setMemoryStatus] = useState<MemoryStatus>("never_analyzed")
   const [suggestions, setSuggestions] = useState<Suggestion[]>([])
   const [selectedVersion, setSelectedVersion] = useState("")
   const [suggestionVersionFilter, setSuggestionVersionFilter] = useState("latest")
@@ -292,6 +329,9 @@ export default function EditorialPanel({ bookId, chapterId, messages }: Props) {
   const [ollamaCheck, setOllamaCheck] = useState("")
   const [reviewing, setReviewing] = useState(false)
   const [reviewStage, setReviewStage] = useState("")
+  const [analyzingMemory, setAnalyzingMemory] = useState(false)
+  const [memoryStage, setMemoryStage] = useState("")
+  const [memoryProgress, setMemoryProgress] = useState({ processed: 0, total: 0 })
   const [error, setError] = useState("")
   const [notice, setNotice] = useState("")
   const [importText, setImportText] = useState("")
@@ -348,7 +388,7 @@ export default function EditorialPanel({ bookId, chapterId, messages }: Props) {
 
   const loadEditorial = useCallback(async () => {
     setLoading(true)
-    const [manuscriptResult, versionsResult, suggestionsResult] = await Promise.all([
+    const [manuscriptResult, versionsResult, suggestionsResult, chapterResult] = await Promise.all([
       supabase.rpc("ensure_chapter_manuscript", { target_chapter_id: chapterId }),
       supabase
         .from("chapter_versions")
@@ -364,6 +404,11 @@ export default function EditorialPanel({ bookId, chapterId, messages }: Props) {
         )
         .eq("chapter_id", chapterId)
         .order("created_at", { ascending: false }),
+      supabase
+        .from("chapters")
+        .select("approved_version_id,memory_status")
+        .eq("id", chapterId)
+        .maybeSingle(),
     ])
     if (manuscriptResult.error) setError(manuscriptResult.error.message)
     else {
@@ -384,6 +429,12 @@ export default function EditorialPanel({ bookId, chapterId, messages }: Props) {
     }
     if (suggestionsResult.error) setError(suggestionsResult.error.message)
     else setSuggestions((suggestionsResult.data ?? []) as Suggestion[])
+    if (chapterResult.error) {
+      setError(chapterResult.error.message)
+    } else {
+      setApprovedVersionId(chapterResult.data?.approved_version_id ?? null)
+      setMemoryStatus((chapterResult.data?.memory_status as MemoryStatus) ?? "never_analyzed")
+    }
     setLoading(false)
   }, [chapterId, supabase])
 
@@ -393,6 +444,30 @@ export default function EditorialPanel({ bookId, chapterId, messages }: Props) {
     }, 0)
     return () => window.clearTimeout(timer)
   }, [loadEditorial])
+
+  async function approveVersion(versionId: string | null) {
+    setError("")
+    setNotice("")
+    const { data, error: approvalError } = await supabase
+      .rpc("set_chapter_approved_version", {
+        target_chapter_id: chapterId,
+        target_version_id: versionId,
+      })
+      .maybeSingle()
+    if (approvalError) {
+      setError("Não foi possível atualizar a versão aprovada: " + approvalError.message)
+      return
+    }
+    const chapter = data as {
+      approved_version_id?: string | null
+      memory_status?: MemoryStatus
+    } | null
+    setApprovedVersionId(chapter?.approved_version_id ?? null)
+    setMemoryStatus(chapter?.memory_status ?? "stale")
+    setNotice(
+      versionId ? "Versão aprovada como snapshot do capítulo." : "Aprovação removida do capítulo.",
+    )
+  }
 
   async function importManuscript() {
     const content = importText.trim()
@@ -678,12 +753,59 @@ export default function EditorialPanel({ bookId, chapterId, messages }: Props) {
       if (chapterError) throw new Error(chapterError.message)
       if (!chapter?.book_id) throw new Error("Capítulo não encontrado")
 
-      const { data: book, error: bookError } = await supabase
-        .from("books")
-        .select("title,description,ai_instructions")
-        .eq("id", chapter.book_id)
-        .maybeSingle()
-      if (bookError) throw new Error(bookError.message)
+      const [
+        bookResult,
+        entitiesResult,
+        factsResult,
+        relationsResult,
+        eventsResult,
+        eventEntitiesResult,
+        openThreadsResult,
+        openThreadEntitiesResult,
+      ] = await Promise.all([
+        supabase
+          .from("books")
+          .select("title,description,ai_instructions")
+          .eq("id", chapter.book_id)
+          .maybeSingle(),
+        supabase
+          .from("universe_entities")
+          .select("id,name,aliases,summary,attributes,visibility")
+          .eq("book_id", chapter.book_id)
+          .eq("visibility", "canon")
+          .is("archived_at", null),
+        supabase
+          .from("canon_facts")
+          .select("entity_id,statement,evidence,visibility,status")
+          .eq("book_id", chapter.book_id)
+          .eq("visibility", "canon")
+          .eq("status", "active")
+          .is("archived_at", null),
+        supabase
+          .from("universe_relations")
+          .select("from_entity_id,to_entity_id,relation_type,description,visibility")
+          .eq("book_id", chapter.book_id)
+          .eq("visibility", "canon")
+          .is("archived_at", null),
+        supabase
+          .from("timeline_events")
+          .select("id,title,description,event_kind,narrative_time,visibility,status")
+          .eq("book_id", chapter.book_id)
+          .eq("visibility", "canon")
+          .eq("status", "active")
+          .is("archived_at", null),
+        supabase.from("timeline_event_entities").select("event_id,entity_id"),
+        supabase
+          .from("open_threads")
+          .select("id,title,description,status,priority,visibility")
+          .eq("book_id", chapter.book_id)
+          .eq("visibility", "canon")
+          .not("status", "in", "(resolved,abandoned,contradicted)")
+          .is("archived_at", null),
+        supabase.from("open_thread_entities").select("thread_id,entity_id"),
+      ])
+      if (bookResult.error) throw new Error(bookResult.error.message)
+      const book = bookResult.data
       const storyContext = [
         book?.title ? `Título: ${book.title}` : "",
         book?.description ? `Resumo da obra: ${book.description}` : "",
@@ -691,6 +813,39 @@ export default function EditorialPanel({ bookId, chapterId, messages }: Props) {
         .filter(Boolean)
         .join("\n")
       const editorialInstructions = String(book?.ai_instructions ?? "").trim()
+      const eventEntityIds = new Map<string, string[]>()
+      for (const row of eventEntitiesResult.error ? [] : (eventEntitiesResult.data ?? [])) {
+        const ids = eventEntityIds.get(row.event_id) ?? []
+        ids.push(row.entity_id)
+        eventEntityIds.set(row.event_id, ids)
+      }
+      const openThreadEntityIds = new Map<string, string[]>()
+      for (const row of openThreadEntitiesResult.error
+        ? []
+        : (openThreadEntitiesResult.data ?? [])) {
+        const ids = openThreadEntityIds.get(row.thread_id) ?? []
+        ids.push(row.entity_id)
+        openThreadEntityIds.set(row.thread_id, ids)
+      }
+      const canonicalMemory = {
+        entities: (entitiesResult.error
+          ? []
+          : (entitiesResult.data ?? [])) as CanonicalMemoryEntity[],
+        facts: (factsResult.error ? [] : (factsResult.data ?? [])) as CanonicalMemoryFact[],
+        relations: (relationsResult.error
+          ? []
+          : (relationsResult.data ?? [])) as CanonicalMemoryRelation[],
+        events: (eventsResult.error ? [] : (eventsResult.data ?? [])).map((event) => ({
+          ...event,
+          entity_ids: eventEntityIds.get(event.id) ?? [],
+        })) as CanonicalMemoryEvent[],
+        openThreads: (openThreadsResult.error ? [] : (openThreadsResult.data ?? [])).map(
+          (thread) => ({
+            ...thread,
+            entity_ids: openThreadEntityIds.get(thread.id) ?? [],
+          }),
+        ) as CanonicalMemoryOpenThread[],
+      }
 
       const { data: startData, error: startError } = await supabase.rpc(
         "start_chapter_version_review",
@@ -741,6 +896,7 @@ export default function EditorialPanel({ bookId, chapterId, messages }: Props) {
           blocks.length,
           storyContext,
           editorialInstructions,
+          buildReviewerContext(blocks[index], canonicalMemory),
         )
         if (!result.suggestions.length) {
           cleanReasons.push(
@@ -826,6 +982,352 @@ export default function EditorialPanel({ bookId, chapterId, messages }: Props) {
       window.clearInterval(timer)
       setReviewing(false)
       setReviewStage("")
+    }
+  }
+
+  async function analyzeMemoryWithOllama() {
+    const activeModel =
+      typeof window === "undefined"
+        ? model
+        : (window.localStorage.getItem("inertia:ollama:model") ?? model)
+    if (!activeModel) {
+      setError("Selecione um modelo no indicador de IA local antes de analisar a memória.")
+      return
+    }
+    if (!approvedVersionId) {
+      setError("Aprove uma versão do Manuscrito como base antes de analisar a memória.")
+      return
+    }
+
+    setAnalyzingMemory(true)
+    setMemoryStage("Preparando a análise da versão aprovada...")
+    setMemoryProgress({ processed: 0, total: 0 })
+    setError("")
+    setNotice("")
+    let runId: string | null = null
+    let processedBlocks = 0
+    try {
+      const modelCheck = await checkOllamaModel(activeModel)
+      if (!modelCheck.ok)
+        throw new Error(
+          modelCheck.error ??
+            "Ollama não está acessível. Verifique se ele está rodando em localhost:11434.",
+        )
+      if (!modelCheck.modelAvailable)
+        throw new Error(
+          `Ollama está acessível, mas o modelo "${activeModel}" não foi encontrado. Execute: ollama pull ${activeModel}`,
+        )
+      if (modelCheck.modelWarning) setNotice(modelCheck.modelWarning)
+
+      const [
+        { data: version, error: versionError },
+        { data: book, error: bookError },
+        { data: entityRows, error: entityError },
+      ] = await Promise.all([
+        supabase
+          .from("chapter_versions")
+          .select("id,chapter_id,content")
+          .eq("id", approvedVersionId)
+          .eq("chapter_id", chapterId)
+          .maybeSingle(),
+        supabase
+          .from("books")
+          .select("title,description,ai_instructions")
+          .eq("id", bookId)
+          .maybeSingle(),
+        supabase
+          .from("universe_entities")
+          .select("name,aliases,entity_type,summary,attributes")
+          .eq("book_id", bookId)
+          .is("archived_at", null)
+          .order("name")
+          .limit(80),
+      ])
+      if (versionError)
+        throw new Error(`Não foi possível ler a versão aprovada: ${versionError.message}`)
+      if (bookError)
+        throw new Error(`Não foi possível ler o contexto do livro: ${bookError.message}`)
+      if (entityError)
+        throw new Error(`Não foi possível ler as entidades do Universo: ${entityError.message}`)
+      if (!version?.content?.trim())
+        throw new Error("A versão aprovada não possui conteúdo para analisar.")
+      if (!book) throw new Error("Livro não encontrado.")
+
+      const storyContext = [
+        book.title ? `Título: ${book.title}` : "",
+        book.description ? `Resumo da obra: ${book.description}` : "",
+      ]
+        .filter(Boolean)
+        .join("\n")
+      const editorialInstructions = String(book.ai_instructions ?? "").trim()
+      const sourceText = String(version.content).slice(0, 180000)
+      const blocks = splitIntoBlocks(sourceText, MEMORY_BLOCK_CHARS)
+      const sourceHash = await memorySourceHash(
+        `[MEMORY_EXTRACTION_V4]\n[BLOCK_CHARS:${MEMORY_BLOCK_CHARS}]\n${sourceText}\n\n[RESUMO]\n${storyContext}\n\n[INSTRUÇÕES]\n${editorialInstructions}`,
+      )
+      setMemoryProgress({ processed: 0, total: blocks.length })
+      setMemoryStage(`Solicitando análise de ${blocks.length} bloco(s)...`)
+
+      const { data: startedData, error: startError } = await supabase.rpc("start_memory_analysis", {
+        target_book_id: bookId,
+        target_chapter_id: chapterId,
+        target_version_id: approvedVersionId,
+        requested_model: activeModel,
+        requested_total_blocks: blocks.length,
+        requested_source_hash: sourceHash,
+      })
+      if (startError)
+        throw new Error(
+          `Não foi possível iniciar a análise de memória. Aplique as migrations 0011, 0012 e 0014 no Supabase. Detalhe: ${startError.message}`,
+        )
+
+      let started = (Array.isArray(startedData) ? startedData[0] : startedData) as {
+        id?: string
+        processed_blocks?: number
+        total_blocks?: number
+        source_hash?: string
+        status?: string
+      } | null
+      if (!started?.id)
+        throw new Error("O Supabase não retornou o identificador da análise de memória.")
+
+      const runUsesCurrentContract =
+        started.source_hash === sourceHash && Number(started.total_blocks) === blocks.length
+      if (!runUsesCurrentContract) {
+        const { error: cancelError } = await supabase.rpc("update_memory_analysis_progress", {
+          target_run_id: started.id,
+          requested_processed_blocks: Number(started.processed_blocks ?? 0),
+          requested_status: "cancelled",
+          requested_error_message:
+            "Run cancelado automaticamente após a atualização do contrato de blocos da memória.",
+        })
+        if (cancelError) throw new Error(cancelError.message)
+        const { data: restartedData, error: restartError } = await supabase.rpc(
+          "start_memory_analysis",
+          {
+            target_book_id: bookId,
+            target_chapter_id: chapterId,
+            target_version_id: approvedVersionId,
+            requested_model: activeModel,
+            requested_total_blocks: blocks.length,
+            requested_source_hash: sourceHash,
+          },
+        )
+        if (restartError) throw new Error(restartError.message)
+        started = (
+          Array.isArray(restartedData) ? restartedData[0] : restartedData
+        ) as typeof started
+      }
+
+      if (!started?.id)
+        throw new Error("O Supabase não retornou o identificador da análise de memória.")
+      runId = started.id
+      processedBlocks = Math.min(Math.max(Number(started.processed_blocks ?? 0), 0), blocks.length)
+      setMemoryProgress({ processed: processedBlocks, total: blocks.length })
+
+      const { data: existingProposals, error: existingError } = await supabase
+        .from("memory_proposals")
+        .select(
+          "id,proposal_kind,title,payload,evidence,explanation,confidence,source_block,source_anchor,dedupe_key,status",
+        )
+        .eq("run_id", started.id)
+        .eq("status", "pending")
+      if (existingError) throw new Error(existingError.message)
+
+      const pendingByKey = new Map<
+        string,
+        { id: string | null; proposal: MemoryProposalRaw; sourceBlock: number }
+      >()
+      const pendingRows = existingProposals ?? []
+      pendingRows.forEach((row) => {
+        const proposal = {
+          proposal_kind: row.proposal_kind,
+          title: row.title,
+          payload: row.payload,
+          evidence: row.evidence,
+          explanation: row.explanation,
+          confidence: row.confidence,
+          source_anchor: row.source_anchor,
+          dedupe_key: row.dedupe_key,
+        } as MemoryProposalRaw
+        const key = memoryProposalKeyBrowser(proposal)
+        if (!pendingByKey.has(key)) {
+          pendingByKey.set(key, {
+            id: String(row.id),
+            proposal,
+            sourceBlock: Number(row.source_block ?? 0),
+          })
+        }
+      })
+
+      const canonicalEntityContext: ExistingMemoryEntity[] = (entityRows ?? []).map((row) => ({
+        name: String(row.name ?? "").trim(),
+        aliases: Array.isArray(row.aliases) ? row.aliases.map((alias) => String(alias)) : [],
+        entity_type: typeof row.entity_type === "string" ? row.entity_type : undefined,
+        summary: typeof row.summary === "string" ? row.summary : undefined,
+        attributes:
+          row.attributes && typeof row.attributes === "object" && !Array.isArray(row.attributes)
+            ? (row.attributes as Record<string, unknown>)
+            : undefined,
+        context_source: "canonical",
+      }))
+
+      const buildEntityContext = () => {
+        const currentRunEntityContext: ExistingMemoryEntity[] = Array.from(pendingByKey.values())
+          .filter(({ proposal }) => proposal.proposal_kind === "entity")
+          .map(({ proposal }) => {
+            const payload = proposal.payload
+            return {
+              name: String(payload.name ?? proposal.title).trim(),
+              aliases: Array.isArray(payload.aliases)
+                ? payload.aliases.map((alias) => String(alias))
+                : [],
+              entity_type:
+                typeof payload.entity_type === "string" ? payload.entity_type : undefined,
+              summary: typeof payload.summary === "string" ? payload.summary : undefined,
+              attributes:
+                payload.attributes &&
+                typeof payload.attributes === "object" &&
+                !Array.isArray(payload.attributes)
+                  ? (payload.attributes as Record<string, unknown>)
+                  : undefined,
+              context_source: "current_run",
+            }
+          })
+
+        return mergeMemoryEntityContexts([...canonicalEntityContext, ...currentRunEntityContext])
+      }
+
+      for (let index = processedBlocks; index < blocks.length; index += 1) {
+        const blockNumber = index + 1
+        setMemoryStage(`A IA está analisando o bloco ${blockNumber} de ${blocks.length}...`)
+        const result = await extractMemoryBlock(
+          activeModel,
+          blocks[index],
+          blockNumber,
+          blocks.length,
+          storyContext,
+          editorialInstructions,
+          buildEntityContext(),
+        )
+        const rowsToInsert: Array<Record<string, unknown>> = []
+        const updatesById = new Map<string, Record<string, unknown>>()
+        const newByKey = new Map<string, number>()
+
+        result.proposals.forEach((proposal: MemoryProposalRaw) => {
+          const key = memoryProposalKeyBrowser(proposal)
+          const existing = pendingByKey.get(key)
+          if (existing) {
+            const merged = mergeMemoryProposalsBrowser(existing.proposal, proposal)
+            existing.proposal = merged
+            pendingByKey.set(key, existing)
+            if (existing.id) {
+              updatesById.set(existing.id, {
+                payload: merged.payload,
+                evidence: merged.evidence,
+                explanation: merged.explanation,
+                confidence: merged.confidence,
+                source_anchor: merged.source_anchor,
+                dedupe_key: key,
+              })
+            } else if (newByKey.has(key)) {
+              rowsToInsert[newByKey.get(key) as number] = {
+                ...rowsToInsert[newByKey.get(key) as number],
+                payload: merged.payload,
+                evidence: merged.evidence,
+                explanation: merged.explanation,
+                confidence: merged.confidence,
+                source_anchor: merged.source_anchor,
+                dedupe_key: key,
+              }
+            }
+            return
+          }
+
+          const row = {
+            run_id: runId,
+            book_id: bookId,
+            chapter_id: chapterId,
+            version_id: approvedVersionId,
+            proposal_kind: proposal.proposal_kind,
+            status: "pending",
+            confidence: proposal.confidence,
+            title: proposal.title,
+            payload: proposal.payload,
+            evidence: proposal.evidence,
+            explanation: proposal.explanation,
+            source_block: blockNumber,
+            source_anchor: proposal.source_anchor,
+            dedupe_key: key,
+          }
+          newByKey.set(key, rowsToInsert.length)
+          rowsToInsert.push(row)
+          pendingByKey.set(key, { id: null, proposal, sourceBlock: blockNumber })
+        })
+
+        for (const [proposalId, patch] of updatesById) {
+          const { error: updateError } = await supabase
+            .from("memory_proposals")
+            .update(patch)
+            .eq("id", proposalId)
+            .eq("status", "pending")
+          if (updateError)
+            throw new Error(`Não foi possível consolidar a proposta: ${updateError.message}`)
+        }
+
+        if (rowsToInsert.length) {
+          const { error: insertError } = await supabase
+            .from("memory_proposals")
+            .upsert(rowsToInsert, { onConflict: "run_id,dedupe_key", ignoreDuplicates: true })
+          if (insertError)
+            throw new Error(`Não foi possível salvar as propostas: ${insertError.message}`)
+        }
+        processedBlocks = blockNumber
+        setMemoryProgress({ processed: processedBlocks, total: blocks.length })
+        const { error: progressError } = await supabase.rpc("update_memory_analysis_progress", {
+          target_run_id: runId,
+          requested_processed_blocks: processedBlocks,
+          requested_status: "running",
+          requested_error_message: "",
+        })
+        if (progressError) throw new Error(progressError.message)
+      }
+
+      setMemoryStage("Finalizando e mantendo as propostas pendentes...")
+      const { error: completeError } = await supabase.rpc("update_memory_analysis_progress", {
+        target_run_id: runId,
+        requested_processed_blocks: processedBlocks,
+        requested_status: "completed",
+        requested_error_message: "",
+      })
+      if (completeError) throw new Error(completeError.message)
+      setNotice(
+        `Análise concluída: ${processedBlocks} bloco(s) processado(s). As propostas ficaram pendentes; nada foi adicionado ao cânone automaticamente.`,
+      )
+    } catch (caught) {
+      const message =
+        caught instanceof Error
+          ? caught.message
+          : "Falha desconhecida durante a análise de memória."
+      if (runId) {
+        const status = processedBlocks > 0 ? "partial" : "failed"
+        await supabase.rpc("update_memory_analysis_progress", {
+          target_run_id: runId,
+          requested_processed_blocks: processedBlocks,
+          requested_status: status,
+          requested_error_message: message,
+        })
+        setNotice(
+          processedBlocks > 0
+            ? `Progresso preservado: ${processedBlocks} bloco(s) processado(s). As propostas parciais continuam visíveis para revisão humana.`
+            : "A análise não conseguiu concluir nenhum bloco; nenhuma proposta foi adicionada.",
+        )
+      }
+      setError(message)
+    } finally {
+      setAnalyzingMemory(false)
+      setMemoryStage("")
+      window.setTimeout(() => setMemoryProgress({ processed: 0, total: 0 }), 500)
     }
   }
 
@@ -1166,6 +1668,25 @@ export default function EditorialPanel({ bookId, chapterId, messages }: Props) {
                       ? "Versão já revisada"
                       : "Revisar com Ollama"}
                 </button>
+                <button
+                  type="button"
+                  onClick={() => void analyzeMemoryWithOllama()}
+                  disabled={analyzingMemory || compiling || reviewing || !approvedVersionId}
+                  className="rounded-xl border border-[#8d6d4c] px-3 py-2 text-sm font-semibold text-[#8d6d4c] disabled:opacity-50"
+                  title={
+                    approvedVersionId
+                      ? "Extrair propostas da versão aprovada sem alterar o cânone"
+                      : "Aprove uma versão antes de analisar a memória"
+                  }
+                >
+                  {analyzingMemory ? "Analisando memória…" : "Analisar Memória"}
+                </button>
+                <Link
+                  href={`/app/livro/${bookId}/universo?tab=analysis&chapterId=${chapterId}`}
+                  className="rounded-xl px-2 py-2 text-xs font-semibold text-[#65735f] underline decoration-[#aab5a3] underline-offset-2"
+                >
+                  Ver propostas
+                </Link>
                 <label className="text-xs text-[#65735f]">
                   Versão
                   <select
@@ -1189,10 +1710,55 @@ export default function EditorialPanel({ bookId, chapterId, messages }: Props) {
                   </select>
                 </label>
               </div>
-              <div className="border-t border-[#e3d8cc] pt-3">
-                <p className="text-xs font-semibold uppercase tracking-widest text-[#65735f]">
-                  Versões e sugestões
+              {approvedVersionId && (
+                <p className="mt-2 text-xs text-[#8b887f]">
+                  Base da memória: V
+                  {versions.find((version) => version.id === approvedVersionId)?.version_number ??
+                    "aprovada"}
+                  . A análise gera propostas; somente os autores podem transformá-las em cânone.
                 </p>
+              )}
+              {memoryStage && (
+                <div
+                  className="mt-3 rounded-xl bg-[#fff8e9] p-3 text-xs text-[#6f5739]"
+                  aria-live="polite"
+                >
+                  <div className="flex items-center justify-between gap-3">
+                    <span>{memoryStage}</span>
+                    {memoryProgress.total > 0 && (
+                      <span className="shrink-0 font-semibold">
+                        {memoryProgress.processed}/{memoryProgress.total}
+                      </span>
+                    )}
+                  </div>
+                  {memoryProgress.total > 0 && (
+                    <div className="mt-2 h-1.5 overflow-hidden rounded-full bg-[#eadcc7]">
+                      <div
+                        className="h-full rounded-full bg-[#8d6d4c] transition-[width] duration-200"
+                        style={{
+                          width: `${Math.round((memoryProgress.processed / memoryProgress.total) * 100)}%`,
+                        }}
+                      />
+                    </div>
+                  )}
+                </div>
+              )}
+              <div className="border-t border-[#e3d8cc] pt-3">
+                <div className="flex flex-wrap items-center justify-between gap-2">
+                  <p className="text-xs font-semibold uppercase tracking-widest text-[#65735f]">
+                    Versões e sugestões
+                  </p>
+                  <span
+                    className={
+                      "rounded-full px-2 py-1 text-[11px] " +
+                      (memoryStatus === "current"
+                        ? "bg-[#e4f2dc] text-[#36552d]"
+                        : "bg-[#f0ebe3] text-[#65735f]")
+                    }
+                  >
+                    {memoryStatusLabel(memoryStatus)}
+                  </span>
+                </div>
                 {versions.length ? (
                   versions.map((version) => (
                     <div
@@ -1222,6 +1788,28 @@ export default function EditorialPanel({ bookId, chapterId, messages }: Props) {
                         <span className="ml-2 text-[#65735f]">
                           {version.review_suggestion_count ?? 0} sugestão(ões)
                         </span>
+                      )}
+                      {approvedVersionId === version.id ? (
+                        <>
+                          <span className="ml-2 rounded-full bg-[#e4f2dc] px-2 py-0.5 text-[#36552d]">
+                            Aprovada
+                          </span>
+                          <button
+                            type="button"
+                            onClick={() => void approveVersion(null)}
+                            className="ml-2 text-[#7b302b] underline decoration-[#c99e96] underline-offset-2"
+                          >
+                            Remover aprovação
+                          </button>
+                        </>
+                      ) : (
+                        <button
+                          type="button"
+                          onClick={() => void approveVersion(version.id)}
+                          className="ml-2 text-[#65735f] underline decoration-[#aab5a3] underline-offset-2"
+                        >
+                          Aprovar como base
+                        </button>
                       )}
                     </div>
                   ))

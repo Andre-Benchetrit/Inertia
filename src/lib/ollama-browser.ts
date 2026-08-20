@@ -53,6 +53,85 @@ export type ReviewBlockResult = {
   done_reason?: string
 }
 
+export type CanonicalMemoryEntity = {
+  id: string
+  name: string
+  aliases?: string[]
+  summary?: string
+  attributes?: Record<string, unknown>
+  visibility?: string
+}
+
+export type CanonicalMemoryFact = {
+  entity_id?: string | null
+  statement: string
+  evidence?: string
+  visibility?: string
+  status?: string
+}
+
+export type CanonicalMemoryRelation = {
+  from_entity_id: string
+  to_entity_id: string
+  relation_type: string
+  description?: string
+  visibility?: string
+}
+
+export type CanonicalMemoryEvent = {
+  id: string
+  title: string
+  description: string
+  event_kind?: string
+  narrative_time?: string
+  entity_ids?: string[]
+  visibility?: string
+  status?: string
+}
+
+export type CanonicalMemoryOpenThread = {
+  id: string
+  title: string
+  description: string
+  status?: string
+  priority?: string
+  entity_ids?: string[]
+  visibility?: string
+}
+
+export type CanonicalMemoryContext = {
+  entities: CanonicalMemoryEntity[]
+  facts: CanonicalMemoryFact[]
+  relations: CanonicalMemoryRelation[]
+  events?: CanonicalMemoryEvent[]
+  openThreads?: CanonicalMemoryOpenThread[]
+}
+
+export type MemoryProposalRaw = {
+  proposal_kind: "entity" | "fact" | "relation" | "event" | "open_thread"
+  title: string
+  payload: Record<string, unknown>
+  evidence: string
+  explanation: string
+  confidence: number
+  source_anchor: string
+  dedupe_key: string
+}
+
+export type MemoryExtractionBlockResult = {
+  proposals: MemoryProposalRaw[]
+  done_reason?: string
+}
+
+export type ExistingMemoryEntity = {
+  name: string
+  aliases?: string[]
+  entity_type?: string
+  summary?: string
+  attributes?: Record<string, unknown>
+  context_source?: "canonical" | "current_run" | "canonical_and_current_run"
+}
+
 export class OllamaError extends Error {
   code: string
 
@@ -73,6 +152,14 @@ const COMPILE_BLOCK_CHARS = 9000
 const COMPILE_BLOCK_OUTPUT_TOKENS = 4096
 const COMPILE_BLOCK_TIMEOUT_MS = 180000
 const AI_INSTRUCTIONS_CONTEXT_TOKENS = 16384
+export const MEMORY_BLOCK_CHARS = 4500
+const MEMORY_EXTRACTION_CONTEXT_TOKENS = 8192
+const MEMORY_EXTRACTION_OUTPUT_TOKENS = 4096
+const MEMORY_EXTRACTION_TIMEOUT_MS = 600000
+const MEMORY_MAX_PROPOSALS_PER_BLOCK = 5
+const MEMORY_EVIDENCE_CHARS = 260
+const MEMORY_EXPLANATION_CHARS = 180
+const MEMORY_SOURCE_ANCHOR_CHARS = 160
 
 async function request<T>(
   path: string,
@@ -307,6 +394,132 @@ export function suggestionKeyBrowser(item: ReviewSuggestion) {
   return [item.suggestion_type, original || normalizePart(item.anchor), suggested].join("|")
 }
 
+export function buildReviewerContext(
+  reviewText: string,
+  memory: CanonicalMemoryContext,
+  maxChars = 7000,
+) {
+  const searchableText = normalizePart(reviewText)
+  const visibleEntities = memory.entities.filter(
+    (entity) => !entity.visibility || entity.visibility === "canon",
+  )
+  const relevantEntities = visibleEntities.filter((entity) => {
+    const names = [entity.name, ...(entity.aliases ?? [])]
+      .map((value) => normalizePart(value))
+      .filter(Boolean)
+    return names.some((name) => searchableText.includes(name))
+  })
+  const relevantIds = new Set(relevantEntities.map((entity) => entity.id))
+  const visibleFacts = memory.facts.filter(
+    (fact) =>
+      (!fact.visibility || fact.visibility === "canon") &&
+      (!fact.status || fact.status === "active"),
+  )
+  const relevantFacts = visibleFacts.filter((fact) => {
+    if (fact.entity_id && relevantIds.has(fact.entity_id)) return true
+    return normalizePart(fact.statement)
+      .split(" ")
+      .filter((word) => word.length >= 4)
+      .some((word) => searchableText.includes(word))
+  })
+  const relevantRelations = memory.relations.filter(
+    (relation) =>
+      (!relation.visibility || relation.visibility === "canon") &&
+      relevantIds.has(relation.from_entity_id) &&
+      relevantIds.has(relation.to_entity_id),
+  )
+  const visibleEvents = (memory.events ?? []).filter(
+    (event) =>
+      (!event.visibility || event.visibility === "canon") &&
+      (!event.status || event.status === "active"),
+  )
+  const relevantEvents = visibleEvents.filter((event) => {
+    if ((event.entity_ids ?? []).some((entityId) => relevantIds.has(entityId))) return true
+    return [event.title, event.description, event.narrative_time]
+      .filter(Boolean)
+      .map((value) => normalizePart(value))
+      .some((value) =>
+        value
+          .split(" ")
+          .filter((word) => word.length >= 4)
+          .some((word) => searchableText.includes(word)),
+      )
+  })
+  const visibleOpenThreads = (memory.openThreads ?? []).filter(
+    (thread) => !thread.visibility || thread.visibility === "canon",
+  )
+  const relevantOpenThreads = visibleOpenThreads.filter((thread) => {
+    if ((thread.entity_ids ?? []).some((entityId) => relevantIds.has(entityId))) return true
+    return [thread.title, thread.description]
+      .filter(Boolean)
+      .map((value) => normalizePart(value))
+      .some((value) =>
+        value
+          .split(" ")
+          .filter((word) => word.length >= 4)
+          .some((word) => searchableText.includes(word)),
+      )
+  })
+
+  const lines = [
+    "MEMÓRIA CANÔNICA RELEVANTE DO UNIVERSO (somente leitura; não altere nem invente canon):",
+  ]
+  const entityNames = new Map(relevantEntities.map((entity) => [entity.id, entity.name]))
+  for (const entity of relevantEntities) {
+    const aliases = entity.aliases?.filter(Boolean).join(", ")
+    const attributes =
+      entity.attributes && Object.keys(entity.attributes).length
+        ? ` Atributos: ${JSON.stringify(entity.attributes)}.`
+        : ""
+    lines.push(
+      `- Entidade: ${entity.name}.${aliases ? ` Apelidos: ${aliases}.` : ""}${entity.summary ? ` Resumo: ${entity.summary}.` : ""}${attributes}`,
+    )
+  }
+  for (const fact of relevantFacts) {
+    lines.push(
+      `- Fato canônico: ${fact.statement}${fact.evidence ? ` Evidência: ${fact.evidence}` : ""}`,
+    )
+  }
+  for (const relation of relevantRelations) {
+    const from = entityNames.get(relation.from_entity_id) ?? "entidade de origem"
+    const to = entityNames.get(relation.to_entity_id) ?? "entidade de destino"
+    lines.push(
+      `- Relação canônica: ${from} — ${relation.relation_type} — ${to}.${relation.description ? ` ${relation.description}` : ""}`,
+    )
+  }
+  for (const event of relevantEvents) {
+    const involved = (event.entity_ids ?? [])
+      .map((entityId) => entityNames.get(entityId))
+      .filter(Boolean)
+      .join(", ")
+    lines.push(
+      `- Evento canônico: ${event.title}.${event.description ? ` ${event.description}` : ""}${event.narrative_time ? ` Quando: ${event.narrative_time}.` : ""}${involved ? ` Envolve: ${involved}.` : ""}`,
+    )
+  }
+  for (const thread of relevantOpenThreads) {
+    const involved = (thread.entity_ids ?? [])
+      .map((entityId) => entityNames.get(entityId))
+      .filter(Boolean)
+      .join(", ")
+    lines.push(
+      `- Trama aberta canônica: ${thread.title}.${thread.description ? ` ${thread.description}` : ""}${thread.status ? ` Estado: ${thread.status}.` : ""}${involved ? ` Relacionada a: ${involved}.` : ""}`,
+    )
+  }
+
+  if (lines.length === 1) {
+    return "MEMÓRIA CANÔNICA RELEVANTE DO UNIVERSO:\nNenhum registro canônico foi identificado como relevante para este bloco. Não invente contexto ausente."
+  }
+
+  const result: string[] = [lines[0]]
+  let length = lines[0].length
+  for (const line of lines.slice(1)) {
+    if (length + line.length + 1 > maxChars) break
+    result.push(line)
+    length += line.length + 1
+  }
+  return result.join("\n")
+}
+
 export function splitIntoBlocks(text: string, blockChars = REVIEW_BLOCK_CHARS) {
   const paragraphs = text
     .replace(/\r\n?/g, "\n")
@@ -370,6 +583,7 @@ function reviewPrompt(
   totalBlocks: number,
   storyContext: string,
   editorialInstructions = "",
+  reviewerMemoryContext = "",
 ) {
   const instructions = editorialInstructions.trim()
     ? `INSTRUÇÕES EDITORIAIS DOS AUTORES:\n${editorialInstructions.trim()}`
@@ -381,6 +595,8 @@ RESUMO DA OBRA:
 ${storyContext || "Não informado pelos autores."}
 
 ${instructions}
+
+${reviewerMemoryContext || "MEMÓRIA CANÔNICA RELEVANTE DO UNIVERSO:\nNenhum registro canônico foi identificado como relevante para este bloco."}
 
 O texto usa Markdown editorial para leitura em estilo Wattpad: ## indica título, linhas em branco indicam parágrafos, **texto** indica negrito, *texto* indica itálico e --- indica mudança de cena. Não trate esses marcadores como erros. Não corrija ação exagerada, onomatopeias, humor, linguagem coloquial, metáforas fortes ou escolhas típicas de ficção científica apenas por serem ousadas. Só sugira mudança de estilo quando houver um problema real de clareza, coerência ou adequação ao contexto fornecido.
 
@@ -397,6 +613,7 @@ export async function reviewBlockLocal(
   totalBlocks: number,
   storyContext: string,
   editorialInstructions = "",
+  reviewerMemoryContext = "",
 ): Promise<ReviewBlockResult> {
   const raw = await request<{ response?: string; done_reason?: string }>(
     "/api/generate",
@@ -404,7 +621,14 @@ export async function reviewBlockLocal(
       method: "POST",
       body: JSON.stringify({
         model,
-        prompt: reviewPrompt(block, blockNumber, totalBlocks, storyContext, editorialInstructions),
+        prompt: reviewPrompt(
+          block,
+          blockNumber,
+          totalBlocks,
+          storyContext,
+          editorialInstructions,
+          reviewerMemoryContext,
+        ),
         stream: false,
         think: false,
         format: "json",
@@ -481,4 +705,687 @@ export async function reviewWithOllama(
   })
 
   return { suggestions: unique, blocksProcessed: blocks.length }
+}
+
+function asObject(value: unknown): Record<string, unknown> {
+  if (!value || typeof value !== "object" || Array.isArray(value)) return {}
+  return value as Record<string, unknown>
+}
+
+const MEMORY_ENTITY_TRANSIENT_KEYS = new Set([
+  "action",
+  "actions",
+  "current_action",
+  "current_goal",
+  "dialogue",
+  "emotion",
+  "mood",
+  "motivation",
+  "personality",
+  "reaction",
+  "response",
+  "scene_behavior",
+  "temporary_state",
+  "thought",
+  "voice",
+])
+
+function normalizeMemoryKey(value: string) {
+  return normalizePart(value)
+    .replace(/[|:;,]+/g, "|")
+    .replace(/\|+/g, "|")
+    .replace(/^\|+|\|+$/g, "")
+}
+
+function memoryEntityNames(entity: ExistingMemoryEntity) {
+  return [entity.name, ...(entity.aliases ?? [])]
+    .map((value) => normalizePart(value))
+    .filter(Boolean)
+}
+
+export function mergeMemoryEntityContexts(entities: ExistingMemoryEntity[]) {
+  const merged: ExistingMemoryEntity[] = []
+
+  for (const incoming of entities) {
+    const incomingNames = memoryEntityNames(incoming)
+    if (!incomingNames.length) continue
+    const existingIndex = merged.findIndex((current) => {
+      const currentNames = memoryEntityNames(current)
+      return incomingNames.some((name) => currentNames.includes(name))
+    })
+
+    if (existingIndex < 0) {
+      merged.push({
+        ...incoming,
+        aliases: [...(incoming.aliases ?? [])],
+        attributes: incoming.attributes ? { ...incoming.attributes } : undefined,
+      })
+      continue
+    }
+
+    const current = merged[existingIndex]
+    const aliases = [...(current.aliases ?? []), ...(incoming.aliases ?? [])]
+      .map((alias) => String(alias).trim())
+      .filter(Boolean)
+      .filter(
+        (alias, index, values) =>
+          values.findIndex((value) => normalizePart(value) === normalizePart(alias)) === index,
+      )
+      .slice(0, 8)
+    const summaries = [current.summary, incoming.summary]
+      .map((summary) =>
+        String(summary ?? "")
+          .replace(/\s+/g, " ")
+          .trim(),
+      )
+      .filter(Boolean)
+      .filter(
+        (summary, index, values) =>
+          values.findIndex((value) => normalizePart(value) === normalizePart(summary)) === index,
+      )
+    const attributes = { ...(current.attributes ?? {}), ...(incoming.attributes ?? {}) }
+    const hasCanonicalSource =
+      current.context_source === "canonical" || incoming.context_source === "canonical"
+    const hasCurrentRunSource =
+      current.context_source === "current_run" || incoming.context_source === "current_run"
+    const context_source: ExistingMemoryEntity["context_source"] =
+      hasCanonicalSource && hasCurrentRunSource
+        ? "canonical_and_current_run"
+        : hasCurrentRunSource
+          ? "current_run"
+          : hasCanonicalSource
+            ? "canonical"
+            : undefined
+
+    merged[existingIndex] = {
+      ...current,
+      aliases,
+      summary: summaries.join(" ").slice(0, 420) || undefined,
+      attributes: Object.keys(attributes).length ? attributes : undefined,
+      entity_type: current.entity_type || incoming.entity_type,
+      context_source,
+    }
+  }
+
+  return merged
+}
+
+function sanitizeEntityPayload(payload: Record<string, unknown>, title: string) {
+  const result: Record<string, unknown> = { ...payload }
+  const name = String(result.name ?? title)
+    .replace(/\s+/g, " ")
+    .trim()
+    .slice(0, 160)
+  if (name) result.name = name
+
+  if (Array.isArray(result.aliases)) {
+    result.aliases = result.aliases
+      .map((alias) => String(alias).replace(/\s+/g, " ").trim().slice(0, 120))
+      .filter(
+        (alias, index, aliases) =>
+          alias && normalizePart(alias) !== normalizePart(name) && aliases.indexOf(alias) === index,
+      )
+      .slice(0, 8)
+  }
+
+  if (typeof result.summary === "string") {
+    result.summary = result.summary.replace(/\s+/g, " ").trim().slice(0, 420)
+  }
+
+  const rawAttributes = asObject(result.attributes)
+  const stableAttributes = Object.fromEntries(
+    Object.entries(rawAttributes).filter(([key]) => {
+      const normalizedKey = normalizePart(key).replace(/\s+/g, "_")
+      return !MEMORY_ENTITY_TRANSIENT_KEYS.has(normalizedKey)
+    }),
+  )
+  result.attributes = stableAttributes
+  return result
+}
+
+function normalizedMemoryProposal(value: unknown, sourceBlock = ""): MemoryProposalRaw | null {
+  const item = asObject(value)
+  const kind = item.proposal_kind
+  if (
+    kind !== "entity" &&
+    kind !== "fact" &&
+    kind !== "relation" &&
+    kind !== "event" &&
+    kind !== "open_thread"
+  )
+    return null
+
+  const title = String(item.title ?? "")
+    .replace(/\s+/g, " ")
+    .trim()
+    .slice(0, 160)
+  const evidence = String(item.evidence ?? "")
+    .trim()
+    .slice(0, MEMORY_EVIDENCE_CHARS)
+  const explanation = String(item.explanation ?? "")
+    .replace(/\s+/g, " ")
+    .trim()
+    .slice(0, MEMORY_EXPLANATION_CHARS)
+  const sourceAnchor = String(item.source_anchor ?? "")
+    .replace(/\s+/g, " ")
+    .trim()
+    .slice(0, MEMORY_SOURCE_ANCHOR_CHARS)
+  const rawPayload = asObject(item.payload)
+  const payload = kind === "entity" ? sanitizeEntityPayload(rawPayload, title) : rawPayload
+  if (kind === "event" || kind === "open_thread") {
+    if (typeof payload.description === "string") {
+      payload.description = payload.description.replace(/\s+/g, " ").trim().slice(0, 1200)
+    }
+    if (Array.isArray(payload.entities_involved)) {
+      payload.entities_involved = payload.entities_involved
+        .map((name) => String(name).replace(/\s+/g, " ").trim().slice(0, 160))
+        .filter(
+          (name, index, names) =>
+            name &&
+            names.findIndex((item) => normalizePart(item) === normalizePart(name)) === index,
+        )
+        .slice(0, 12)
+    }
+  }
+  const numericConfidence = Number(item.confidence)
+  const confidence = Number.isFinite(numericConfidence)
+    ? Math.max(0, Math.min(1, numericConfidence))
+    : 0
+  const fallbackKey = [
+    kind,
+    normalizeMemoryKey(String(payload.name ?? title)),
+    normalizeMemoryKey(
+      String(payload.statement ?? payload.relation_type ?? payload.description ?? ""),
+    ),
+  ]
+    .filter(Boolean)
+    .join("|")
+  const dedupeKey = normalizeMemoryKey(String(item.dedupe_key ?? fallbackKey)).slice(0, 500)
+  const normalizedEvidence = normalizePart(evidence)
+  const normalizedSourceBlock = normalizePart(sourceBlock)
+  const evidenceIsGrounded =
+    !normalizedSourceBlock ||
+    normalizedEvidence.length < 8 ||
+    normalizedSourceBlock.includes(normalizedEvidence)
+
+  if (!title || !evidence || !explanation || !sourceAnchor || !dedupeKey || !evidenceIsGrounded)
+    return null
+
+  return {
+    proposal_kind: kind,
+    title,
+    payload,
+    evidence,
+    explanation,
+    confidence,
+    source_anchor: sourceAnchor,
+    dedupe_key: dedupeKey,
+  }
+}
+
+export function buildMemoryExtractionPrompt(
+  block: string,
+  blockNumber: number,
+  totalBlocks: number,
+  storyContext: string,
+  editorialInstructions: string,
+  existingEntities: ExistingMemoryEntity[] = [],
+) {
+  const summary = storyContext.trim()
+    ? storyContext.trim().slice(0, 1800)
+    : "Não informado pelos autores."
+  const instructions = editorialInstructions.trim()
+    ? editorialInstructions.trim().slice(0, 3000)
+    : "Nenhuma instrução editorial adicional foi informada."
+  const normalizedBlock = normalizePart(block)
+  const knownEntities = existingEntities.length
+    ? [...existingEntities]
+        .sort((left, right) => {
+          const leftRelevant = memoryEntityNames(left).some((name) =>
+            normalizedBlock.includes(name),
+          )
+          const rightRelevant = memoryEntityNames(right).some((name) =>
+            normalizedBlock.includes(name),
+          )
+          return Number(rightRelevant) - Number(leftRelevant)
+        })
+        .slice(0, 30)
+        .map((entity) => {
+          const aliases = entity.aliases?.filter(Boolean).join(", ")
+          const type = entity.entity_type ? `; tipo: ${entity.entity_type}` : ""
+          const summary = entity.summary ? `; resumo: ${entity.summary.slice(0, 240)}` : ""
+          const attributes =
+            entity.attributes && Object.keys(entity.attributes).length
+              ? `; dados estáveis: ${Object.entries(entity.attributes)
+                  .slice(0, 6)
+                  .map(
+                    ([key, value]) =>
+                      `${key}=${String(JSON.stringify(value) ?? value).slice(0, 100)}`,
+                  )
+                  .join(", ")}`
+              : ""
+          const source =
+            entity.context_source === "current_run"
+              ? "proposta pendente desta análise"
+              : entity.context_source === "canonical_and_current_run"
+                ? "cânone e proposta pendente desta análise"
+                : "cânone atual"
+          return `- ${entity.name}${aliases ? ` (apelidos: ${aliases})` : ""}${type}${summary}${attributes} [${source}]`
+        })
+        .join("\n")
+    : "Nenhuma entidade conhecida foi cadastrada ou proposta ainda."
+
+  return `Você é um arquivista conservador de memória narrativa. Analise somente o bloco de História abaixo e proponha registros estruturados para que os autores decidam depois. Você NÃO pode criar cânone, alterar o Universo, completar lacunas ou inventar lore. Comentários dos autores não fazem parte deste bloco.
+
+Retorne somente JSON válido, sem Markdown, prefácio ou bloco de código, no formato:
+{"proposals":[{"proposal_kind":"entity|fact|relation|event|open_thread","title":"...","payload":{},"evidence":"...","explanation":"...","confidence":0.0,"source_anchor":"...","dedupe_key":"..."}]}
+
+Regras de segurança e interpretação:
+- Extraia somente informações sustentadas pelo texto. Se algo for apenas uma possibilidade, marque isso no payload como "certainty": "possible_inference" e explique a incerteza; nunca apresente uma inferência como fato explícito.
+- Diferencie explicitamente no payload entre "certainty": "explicit_fact" e "certainty": "possible_inference". Prefira não propor uma inferência fraca.
+- Não transforme uma menção passageira em uma regra do mundo sem evidência. Não invente nomes, atributos, relações, cronologia ou intenções.
+- Uma entidade é uma ficha estável de identidade. Não coloque em entity summary ou attributes ações pontuais, falas, respostas, reações, emoções da cena, humor passageiro, pensamentos, objetivos momentâneos, aparência de um objeto próximo ou acontecimentos do bloco.
+- Para uma entidade nova, exija nome ou identidade clara e use payload com entity_type, name, summary, aliases e attributes. entity_type deve ser character, location, faction, organization, power, item, creature, concept ou other.
+- Um alias deve ser somente um nome, apelido ou forma textual pela qual a entidade é chamada. Não use descrições como alias. Se não houver alias real, retorne aliases como lista vazia.
+- Não ignore uma entidade já conhecida. Se o bloco trouxer identidade, aparência, espécie, origem, ocupação, parentesco, capacidade, alias ou resumo estável novo, use uma proposta entity com o mesmo nome para enriquecer a ficha; não converta esse enriquecimento em fact. Use fact apenas para informação estável que não pertence à identidade da entidade ou para uma afirmação do mundo associada a entity_name.
+- Informações temporárias de cena, comportamento observado, falas e acontecimentos não devem ser forçadas para dentro de entity ou fact.
+- Para um fato, use payload com entity_name (ou null), statement, certainty e source_kind: "memory_analysis". O fato deve ser estável ou explicitamente apresentado como informação do mundo, não uma ação isolada.
+- Para uma relação, use payload com from_entity, to_entity, relation_type, description e certainty. Só proponha uma relação quando o texto sustentar o vínculo, não apenas porque duas entidades apareceram na mesma cena.
+- Para um event, registre algo que realmente aconteceu no trecho. Use payload com title, description, event_kind, entities_involved (array de nomes), certainty e source_kind: "memory_analysis". event_kind deve ser action, revelation, conflict, relationship_change, discovery, scene ou other.
+- Para um open_thread, registre uma pergunta, mistério, conflito ou objetivo ainda não resolvido. Use payload com title, description, thread_status: "open", entities_involved (array de nomes), certainty e source_kind: "memory_analysis". Não transforme um acontecimento já resolvido em trama aberta.
+- Eventos e tramas abertas podem mencionar entidades que ainda não existem no Universo; mantenha os nomes no array entities_involved e não invente fichas para elas.
+- evidence deve ser uma citação curta, consecutiva e copiada exatamente do bloco que sustenta a proposta, com no máximo 260 caracteres. Se você não conseguir apontar um trecho que sustente a informação principal, não faça a proposta.
+- source_anchor deve ser uma referência curta e útil para localizar o trecho, com no máximo 160 caracteres.
+- explanation deve dizer em português, em no máximo 180 caracteres, por que a proposta merece revisão humana e mencionar qualquer incerteza.
+- title, explanation e os valores textuais livres do payload devem ser escritos em português brasileiro. Preserve nomes próprios, aliases, identificadores, enums, valores de certainty, source_kind e dedupe_key; evidence e source_anchor devem ser copiados exatamente do bloco original.
+- confidence deve ser um número entre 0 e 1, representando a confiança da extração, não uma decisão de canonização.
+- dedupe_key deve ser estável, minúsculo e específico, combinando tipo, nome ou título e conteúdo principal; não use o número do bloco como parte da chave. Use a mesma chave para a mesma afirmação em blocos diferentes.
+- Se não houver informação nova e sustentada, retorne {"proposals":[]}.
+- Não inclua propostas de revisão linguística, formatação ou estilo.
+- No máximo ${MEMORY_MAX_PROPOSALS_PER_BLOCK} propostas neste bloco. Priorize entidades novas e enriquecimentos de entidades conhecidas antes de eventos secundários, mas preserve eventos ou tramas claramente relevantes. Mantenha title curto, payload conciso e não repita a evidência inteira dentro do payload.
+- Use a mesma dedupe_key para o mesmo evento ou a mesma trama em blocos diferentes: combine o tipo, o título e os nomes das entidades, sem usar o número do bloco. Para eventos, não use a descrição inteira como chave; para open_thread, não use o status como parte principal da chave.
+
+RESUMO DA OBRA:
+${summary}
+
+INSTRUÇÕES EDITORIAIS DOS AUTORES:
+${instructions}
+
+ENTIDADES JÁ CONHECIDAS — NÃO DUPLIQUE SEM INFORMAÇÃO NOVA:
+${knownEntities}
+
+BLOCO ${blockNumber} DE ${totalBlocks}:
+${block}`
+}
+
+export async function extractMemoryBlock(
+  model: string,
+  block: string,
+  blockNumber: number,
+  totalBlocks: number,
+  storyContext: string,
+  editorialInstructions: string,
+  existingEntities: ExistingMemoryEntity[] = [],
+): Promise<MemoryExtractionBlockResult> {
+  const prompt = buildMemoryExtractionPrompt(
+    block,
+    blockNumber,
+    totalBlocks,
+    storyContext,
+    editorialInstructions,
+    existingEntities,
+  )
+  const callExtraction = (requestPrompt: string, outputTokens: number) =>
+    request<{ response?: string; done_reason?: string }>(
+      "/api/generate",
+      {
+        method: "POST",
+        body: JSON.stringify({
+          model,
+          prompt: requestPrompt,
+          stream: false,
+          think: false,
+          format: "json",
+          options: {
+            num_predict: outputTokens,
+            temperature: 0.1,
+            num_ctx: MEMORY_EXTRACTION_CONTEXT_TOKENS,
+          },
+        }),
+      },
+      MEMORY_EXTRACTION_TIMEOUT_MS,
+    )
+
+  let raw = await callExtraction(prompt, MEMORY_EXTRACTION_OUTPUT_TOKENS)
+  if (raw.done_reason === "length") {
+    raw = await callExtraction(
+      `${prompt}\n\nMODO COMPACTO DE RECUPERAÇÃO: retorne no máximo uma proposta realmente nova. Use um payload mínimo com apenas os campos exigidos para o tipo. evidence deve ter no máximo 240 caracteres, source_anchor no máximo 80 caracteres e explanation no máximo 160 caracteres. Se não conseguir completar o JSON, retorne {"proposals":[]}.`,
+      2048,
+    )
+  }
+
+  if (raw.done_reason === "length") {
+    throw new OllamaError(
+      `O Ollama atingiu o limite de saída ao analisar o bloco ${blockNumber} de ${totalBlocks}.`,
+      "OLLAMA_OUTPUT_LIMIT",
+    )
+  }
+
+  let parsed: unknown
+  try {
+    parsed = JSON.parse(raw.response ?? "{}")
+  } catch {
+    throw new OllamaError(
+      `A resposta do Ollama para a memória do bloco ${blockNumber} não veio em JSON válido.`,
+      "OLLAMA_INVALID_JSON",
+    )
+  }
+
+  const parsedObject = asObject(parsed)
+  const rawProposals = parsedObject.proposals
+  const proposals = Array.isArray(rawProposals)
+    ? rawProposals
+        .map((proposal: unknown) => normalizedMemoryProposal(proposal, block))
+        .filter((proposal): proposal is MemoryProposalRaw => Boolean(proposal))
+        .slice(0, MEMORY_MAX_PROPOSALS_PER_BLOCK)
+    : []
+
+  return {
+    proposals,
+    done_reason: raw.done_reason,
+  }
+}
+
+export type MemoryProposalTranslation = {
+  title: string
+  explanation: string
+  payload: Record<string, unknown>
+}
+
+const MEMORY_TRANSLATION_OUTPUT_TOKENS = 3072
+const MEMORY_TRANSLATION_TIMEOUT_MS = 180000
+
+export function buildMemoryProposalTranslationPrompt(
+  proposalKind: MemoryProposalRaw["proposal_kind"],
+  title: string,
+  payload: Record<string, unknown>,
+  explanation: string,
+) {
+  return `Traduza os campos explicativos desta proposta de memória narrativa para português brasileiro. Não reanalise a história, não crie informação e não altere o sentido.
+
+Retorne somente JSON válido, sem Markdown, exatamente neste formato:
+{"title":"...","explanation":"...","payload":{}}
+
+Regras obrigatórias:
+- Traduza apenas linguagem natural. Preserve a estrutura do objeto, as chaves, tipos, números, booleanos e arrays.
+- Preserve exatamente nomes próprios, nomes de entidades, aliases, identificadores, valores de entity_type, certainty, source_kind, relation_type e qualquer código ou enum.
+- Se title for apenas o nome de uma entidade ou relação, mantenha-o sem tradução. Traduza title somente quando ele for uma descrição comum.
+- Traduza summary, statement, description, background, personality, actions e outros valores descritivos livres do payload, mantendo nomes próprios dentro das frases.
+- Não traduza nem reescreva evidências, âncoras, citações, nomes de personagens ou trechos que funcionem como identificadores.
+- Não acrescente comentários, campos, inferências ou justificativas novas.
+- proposta_kind: ${proposalKind}
+
+TITLE:
+${title}
+
+EXPLANATION:
+${explanation}
+
+PAYLOAD JSON:
+${JSON.stringify(payload)}`
+}
+
+export async function translateMemoryProposalToPortuguese(
+  model: string,
+  proposal: Pick<MemoryProposalRaw, "proposal_kind" | "title" | "payload" | "explanation">,
+): Promise<MemoryProposalTranslation> {
+  const raw = await request<{ response?: string; done_reason?: string }>(
+    "/api/generate",
+    {
+      method: "POST",
+      body: JSON.stringify({
+        model,
+        prompt: buildMemoryProposalTranslationPrompt(
+          proposal.proposal_kind,
+          proposal.title,
+          proposal.payload,
+          proposal.explanation,
+        ),
+        stream: false,
+        think: false,
+        format: "json",
+        options: {
+          num_predict: MEMORY_TRANSLATION_OUTPUT_TOKENS,
+          temperature: 0.1,
+          num_ctx: AI_INSTRUCTIONS_CONTEXT_TOKENS,
+        },
+      }),
+    },
+    MEMORY_TRANSLATION_TIMEOUT_MS,
+  )
+
+  if (raw.done_reason === "length")
+    throw new OllamaError(
+      "O Ollama atingiu o limite ao traduzir a proposta.",
+      "OLLAMA_OUTPUT_LIMIT",
+    )
+
+  let parsed: unknown
+  try {
+    parsed = JSON.parse(raw.response ?? "{}")
+  } catch {
+    throw new OllamaError("A tradução da proposta não veio em JSON válido.", "OLLAMA_INVALID_JSON")
+  }
+  const value = asObject(parsed)
+  const payloadValue = value.payload
+  if (!payloadValue || typeof payloadValue !== "object" || Array.isArray(payloadValue))
+    throw new OllamaError(
+      "A tradução da proposta retornou um payload inválido.",
+      "OLLAMA_INVALID_JSON",
+    )
+  const translatedPayload = payloadValue as Record<string, unknown>
+  const missingPayloadKeys = Object.keys(proposal.payload).filter(
+    (key) => !(key in translatedPayload),
+  )
+  if (missingPayloadKeys.length)
+    throw new OllamaError(
+      "A tradução da proposta omitiu dados estruturados existentes.",
+      "OLLAMA_INVALID_JSON",
+    )
+  const translatedTitle = typeof value.title === "string" ? value.title.trim() : ""
+  const translatedExplanation =
+    typeof value.explanation === "string" ? value.explanation.trim() : ""
+  if (!translatedTitle || !translatedExplanation)
+    throw new OllamaError(
+      "A tradução da proposta retornou campos incompletos.",
+      "OLLAMA_INVALID_JSON",
+    )
+
+  return {
+    title: translatedTitle,
+    explanation: translatedExplanation,
+    payload: translatedPayload,
+  }
+}
+
+function mergeTextValues(values: string[], maxLength: number) {
+  const unique = values
+    .map((value) => value.trim())
+    .filter(Boolean)
+    .filter(
+      (value, index, items) =>
+        items.findIndex((item) => normalizePart(item) === normalizePart(value)) === index,
+    )
+  return unique.join("\n\n").slice(0, maxLength)
+}
+
+function mergeEntityPayload(
+  basePayload: Record<string, unknown>,
+  incomingPayload: Record<string, unknown>,
+) {
+  const merged: Record<string, unknown> = { ...basePayload }
+  const conflicts: string[] = []
+
+  const baseAliases = Array.isArray(basePayload.aliases) ? basePayload.aliases : []
+  const incomingAliases = Array.isArray(incomingPayload.aliases) ? incomingPayload.aliases : []
+  const aliases = [...baseAliases, ...incomingAliases]
+    .map((alias) => String(alias).trim())
+    .filter(Boolean)
+    .filter(
+      (alias, index, items) =>
+        items.findIndex((item) => normalizePart(item) === normalizePart(alias)) === index,
+    )
+    .slice(0, 8)
+  if (aliases.length) merged.aliases = aliases
+
+  const baseSummary = typeof basePayload.summary === "string" ? basePayload.summary : ""
+  const incomingSummary = typeof incomingPayload.summary === "string" ? incomingPayload.summary : ""
+  if (incomingSummary && !normalizePart(baseSummary).includes(normalizePart(incomingSummary))) {
+    merged.summary = mergeTextValues([baseSummary, incomingSummary], 420)
+  }
+
+  const baseEntityType = String(basePayload.entity_type ?? "").trim()
+  const incomingEntityType = String(incomingPayload.entity_type ?? "").trim()
+  if (!baseEntityType && incomingEntityType) {
+    merged.entity_type = incomingEntityType
+  } else if (
+    baseEntityType &&
+    incomingEntityType &&
+    normalizePart(baseEntityType) !== normalizePart(incomingEntityType)
+  ) {
+    conflicts.push("entity_type")
+  }
+
+  const baseAttributes = asObject(basePayload.attributes)
+  const incomingAttributes = asObject(incomingPayload.attributes)
+  const mergedAttributes: Record<string, unknown> = { ...baseAttributes }
+  Object.entries(incomingAttributes).forEach(([key, incomingValue]) => {
+    if (!(key in mergedAttributes)) {
+      mergedAttributes[key] = incomingValue
+      return
+    }
+    const currentValue = mergedAttributes[key]
+    if (JSON.stringify(currentValue) === JSON.stringify(incomingValue)) return
+    if (Array.isArray(currentValue) && Array.isArray(incomingValue)) {
+      mergedAttributes[key] = [...currentValue, ...incomingValue].filter(
+        (value, index, items) =>
+          items.findIndex((item) => JSON.stringify(item) === JSON.stringify(value)) === index,
+      )
+      return
+    }
+    mergedAttributes[key] = [currentValue, incomingValue].filter(
+      (value, index, items) =>
+        items.findIndex((item) => JSON.stringify(item) === JSON.stringify(value)) === index,
+    )
+    conflicts.push(key)
+  })
+  merged.attributes = mergedAttributes
+
+  return { payload: merged, conflicts }
+}
+
+export function memoryProposalKeyBrowser(item: MemoryProposalRaw) {
+  const payload = asObject(item.payload)
+  if (item.proposal_kind === "entity") {
+    return ["entity", normalizeMemoryKey(String(payload.name ?? item.title))].join("|")
+  }
+  if (item.proposal_kind === "fact") {
+    return [
+      "fact",
+      normalizeMemoryKey(String(payload.entity_name ?? "")),
+      normalizeMemoryKey(String(payload.statement ?? item.title)),
+    ].join("|")
+  }
+  if (item.proposal_kind === "relation") {
+    return [
+      "relation",
+      normalizeMemoryKey(String(payload.from_entity ?? "")),
+      normalizeMemoryKey(String(payload.relation_type ?? item.title)),
+      normalizeMemoryKey(String(payload.to_entity ?? "")),
+    ].join("|")
+  }
+  const involved = Array.isArray(payload.entities_involved)
+    ? payload.entities_involved
+        .map((name) => normalizeMemoryKey(String(name)))
+        .sort()
+        .join(",")
+    : ""
+  return [item.proposal_kind, normalizeMemoryKey(item.title), involved].filter(Boolean).join("|")
+}
+
+export function mergeMemoryProposalsBrowser(
+  base: MemoryProposalRaw,
+  incoming: MemoryProposalRaw,
+): MemoryProposalRaw {
+  if (base.proposal_kind !== incoming.proposal_kind) return base
+
+  let payload = base.payload
+  let conflicts: string[] = []
+  if (base.proposal_kind === "entity") {
+    const merged = mergeEntityPayload(base.payload, incoming.payload)
+    payload = merged.payload
+    conflicts = merged.conflicts
+  } else if (base.proposal_kind === "event" || base.proposal_kind === "open_thread") {
+    const baseDescription =
+      typeof base.payload.description === "string" ? base.payload.description : ""
+    const incomingDescription =
+      typeof incoming.payload.description === "string" ? incoming.payload.description : ""
+    const baseEntities = Array.isArray(base.payload.entities_involved)
+      ? base.payload.entities_involved
+      : []
+    const incomingEntities = Array.isArray(incoming.payload.entities_involved)
+      ? incoming.payload.entities_involved
+      : []
+    const entities = [...baseEntities, ...incomingEntities]
+      .map((name) => String(name).trim())
+      .filter(Boolean)
+      .filter(
+        (name, index, names) =>
+          names.findIndex((item) => normalizePart(item) === normalizePart(name)) === index,
+      )
+      .slice(0, 12)
+    payload = {
+      ...base.payload,
+      description: mergeTextValues([baseDescription, incomingDescription], 1200),
+      entities_involved: entities,
+    }
+    const baseStatus = String(base.payload.thread_status ?? "")
+    const incomingStatus = String(incoming.payload.thread_status ?? "")
+    if (
+      base.proposal_kind === "open_thread" &&
+      baseStatus &&
+      incomingStatus &&
+      baseStatus !== incomingStatus
+    ) {
+      conflicts.push("thread_status")
+    }
+    const baseEventKind = String(base.payload.event_kind ?? "")
+    const incomingEventKind = String(incoming.payload.event_kind ?? "")
+    if (
+      base.proposal_kind === "event" &&
+      baseEventKind &&
+      incomingEventKind &&
+      baseEventKind !== incomingEventKind
+    ) {
+      conflicts.push("event_kind")
+    }
+  }
+
+  const conflictNote = conflicts.length
+    ? ` Conflito para decisão humana nos campos: ${conflicts.join(", ")}.`
+    : ""
+  const explanation = mergeTextValues(
+    [base.explanation, incoming.explanation, conflictNote],
+    MEMORY_EXPLANATION_CHARS,
+  )
+  const merged = {
+    ...base,
+    payload,
+    evidence: mergeTextValues([base.evidence, incoming.evidence], 900),
+    explanation,
+    confidence: Math.max(base.confidence, incoming.confidence),
+    source_anchor: mergeTextValues([base.source_anchor, incoming.source_anchor], 320),
+  }
+
+  return { ...merged, dedupe_key: memoryProposalKeyBrowser(merged) }
 }
