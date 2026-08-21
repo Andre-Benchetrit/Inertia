@@ -533,7 +533,8 @@ export default function UniversePage() {
       facts: facts.map((fact) => ({
         id: fact.id,
         entity_id: fact.entity_id,
-        subject_entity: fact.entity_id ? entityById.get(fact.entity_id)?.name ?? null : null,
+        subject_entity:
+          fact.entity_id ? entities.find((entity) => entity.id === fact.entity_id)?.name ?? null : null,
         title: fact.title,
         statement: fact.statement,
         evidence: fact.evidence,

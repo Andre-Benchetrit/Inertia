@@ -1,0 +1,13 @@
+
+> inertia-scaffold@0.1.0 dev
+> next dev --hostname 0.0.0.0
+
+▲ Next.js 16.3.1 (Turbopack)
+- Local:         http://localhost:3000
+- Network:       http://0.0.0.0:3000
+- Environments: .env.local
+✓ Ready in 826ms
+✓ Running next.config.ts took 45ms
+
+ GET /login?next=%2Fapp 200 in 1051ms (next.js: 790ms, application-code: 261ms)
+^C^C
