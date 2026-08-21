@@ -762,6 +762,7 @@ export default function EditorialPanel({ bookId, chapterId, messages }: Props) {
         eventEntitiesResult,
         openThreadsResult,
         openThreadEntitiesResult,
+        sourceChaptersResult,
       ] = await Promise.all([
         supabase
           .from("books")
@@ -776,20 +777,26 @@ export default function EditorialPanel({ bookId, chapterId, messages }: Props) {
           .is("archived_at", null),
         supabase
           .from("canon_facts")
-          .select("entity_id,statement,evidence,visibility,status")
+          .select(
+            "entity_id,statement,evidence,source_kind,source_chapter_id,source_version_id,visibility,status",
+          )
           .eq("book_id", chapter.book_id)
           .eq("visibility", "canon")
           .eq("status", "active")
           .is("archived_at", null),
         supabase
           .from("universe_relations")
-          .select("from_entity_id,to_entity_id,relation_type,description,visibility")
+          .select(
+            "from_entity_id,to_entity_id,relation_type,description,source_kind,source_chapter_id,source_version_id,visibility",
+          )
           .eq("book_id", chapter.book_id)
           .eq("visibility", "canon")
           .is("archived_at", null),
         supabase
           .from("timeline_events")
-          .select("id,title,description,event_kind,narrative_time,visibility,status")
+          .select(
+            "id,title,description,event_kind,narrative_time,source_kind,source_chapter_id,source_version_id,visibility,status",
+          )
           .eq("book_id", chapter.book_id)
           .eq("visibility", "canon")
           .eq("status", "active")
@@ -797,12 +804,19 @@ export default function EditorialPanel({ bookId, chapterId, messages }: Props) {
         supabase.from("timeline_event_entities").select("event_id,entity_id"),
         supabase
           .from("open_threads")
-          .select("id,title,description,status,priority,visibility")
+          .select(
+            "id,title,description,status,priority,source_kind,source_chapter_id,source_version_id,visibility",
+          )
           .eq("book_id", chapter.book_id)
           .eq("visibility", "canon")
           .not("status", "in", "(resolved,abandoned,contradicted)")
           .is("archived_at", null),
         supabase.from("open_thread_entities").select("thread_id,entity_id"),
+        supabase
+          .from("chapters")
+          .select("id,chapter_number,title")
+          .eq("book_id", chapter.book_id)
+          .order("chapter_number", { ascending: true }),
       ])
       if (bookResult.error) throw new Error(bookResult.error.message)
       const book = bookResult.data
@@ -813,6 +827,50 @@ export default function EditorialPanel({ bookId, chapterId, messages }: Props) {
         .filter(Boolean)
         .join("\n")
       const editorialInstructions = String(book?.ai_instructions ?? "").trim()
+      const sourceChapterRows = sourceChaptersResult.error ? [] : (sourceChaptersResult.data ?? [])
+      const sourceChapterLabels = new Map(
+        sourceChapterRows.map((sourceChapter) => {
+          const numberLabel = `Capítulo ${sourceChapter.chapter_number}`
+          const title = String(sourceChapter.title ?? "").trim()
+          return [sourceChapter.id, title ? `${numberLabel}: ${title}` : numberLabel] as const
+        }),
+      )
+      const sourceChapterIds = sourceChapterRows.map((sourceChapter) => sourceChapter.id)
+      let sourceVersionRows: Array<{
+        id: string
+        chapter_id: string
+        version_number: number
+      }> = []
+      if (sourceChapterIds.length) {
+        const sourceVersionsResult = await supabase
+          .from("chapter_versions")
+          .select("id,chapter_id,version_number")
+          .in("chapter_id", sourceChapterIds)
+        if (!sourceVersionsResult.error) {
+          sourceVersionRows = sourceVersionsResult.data ?? []
+        }
+      }
+      const sourceVersionLabels = new Map(
+        sourceVersionRows.map(
+          (sourceVersion) => [sourceVersion.id, `Versão ${sourceVersion.version_number}`] as const,
+        ),
+      )
+      const withSourceLabels = <
+        T extends {
+          source_chapter_id?: string | null
+          source_version_id?: string | null
+        },
+      >(
+        record: T,
+      ) => ({
+        ...record,
+        source_chapter_label: record.source_chapter_id
+          ? sourceChapterLabels.get(record.source_chapter_id)
+          : undefined,
+        source_version_label: record.source_version_id
+          ? sourceVersionLabels.get(record.source_version_id)
+          : undefined,
+      })
       const eventEntityIds = new Map<string, string[]>()
       for (const row of eventEntitiesResult.error ? [] : (eventEntitiesResult.data ?? [])) {
         const ids = eventEntityIds.get(row.event_id) ?? []
@@ -831,16 +889,20 @@ export default function EditorialPanel({ bookId, chapterId, messages }: Props) {
         entities: (entitiesResult.error
           ? []
           : (entitiesResult.data ?? [])) as CanonicalMemoryEntity[],
-        facts: (factsResult.error ? [] : (factsResult.data ?? [])) as CanonicalMemoryFact[],
-        relations: (relationsResult.error
-          ? []
-          : (relationsResult.data ?? [])) as CanonicalMemoryRelation[],
-        events: (eventsResult.error ? [] : (eventsResult.data ?? [])).map((event) => ({
-          ...event,
-          entity_ids: eventEntityIds.get(event.id) ?? [],
-        })) as CanonicalMemoryEvent[],
-        openThreads: (openThreadsResult.error ? [] : (openThreadsResult.data ?? [])).map(
-          (thread) => ({
+        facts: (factsResult.error ? [] : (factsResult.data ?? [])).map(
+          withSourceLabels,
+        ) as CanonicalMemoryFact[],
+        relations: (relationsResult.error ? [] : (relationsResult.data ?? [])).map(
+          withSourceLabels,
+        ) as CanonicalMemoryRelation[],
+        events: (eventsResult.error ? [] : (eventsResult.data ?? [])).map((event) =>
+          withSourceLabels({
+            ...event,
+            entity_ids: eventEntityIds.get(event.id) ?? [],
+          }),
+        ) as CanonicalMemoryEvent[],
+        openThreads: (openThreadsResult.error ? [] : (openThreadsResult.data ?? [])).map((thread) =>
+          withSourceLabels({
             ...thread,
             entity_ids: openThreadEntityIds.get(thread.id) ?? [],
           }),
@@ -1063,7 +1125,7 @@ export default function EditorialPanel({ bookId, chapterId, messages }: Props) {
       const sourceText = String(version.content).slice(0, 180000)
       const blocks = splitIntoBlocks(sourceText, MEMORY_BLOCK_CHARS)
       const sourceHash = await memorySourceHash(
-        `[MEMORY_EXTRACTION_V4]\n[BLOCK_CHARS:${MEMORY_BLOCK_CHARS}]\n${sourceText}\n\n[RESUMO]\n${storyContext}\n\n[INSTRUÇÕES]\n${editorialInstructions}`,
+        `[MEMORY_EXTRACTION_V5]\n[BLOCK_CHARS:${MEMORY_BLOCK_CHARS}]\n${sourceText}\n\n[RESUMO]\n${storyContext}\n\n[INSTRUÇÕES]\n${editorialInstructions}`,
       )
       setMemoryProgress({ processed: 0, total: blocks.length })
       setMemoryStage(`Solicitando análise de ${blocks.length} bloco(s)...`)
@@ -1130,14 +1192,17 @@ export default function EditorialPanel({ bookId, chapterId, messages }: Props) {
         .select(
           "id,proposal_kind,title,payload,evidence,explanation,confidence,source_block,source_anchor,dedupe_key,status",
         )
-        .eq("run_id", started.id)
+        .eq("version_id", approvedVersionId)
         .eq("status", "pending")
+        .order("created_at", { ascending: true })
       if (existingError) throw new Error(existingError.message)
 
       const pendingByKey = new Map<
         string,
         { id: string | null; proposal: MemoryProposalRaw; sourceBlock: number }
       >()
+      const crossRunUpdatesById = new Map<string, Record<string, unknown>>()
+      const supersededPendingIds: string[] = []
       const pendingRows = existingProposals ?? []
       pendingRows.forEach((row) => {
         const proposal = {
@@ -1151,14 +1216,57 @@ export default function EditorialPanel({ bookId, chapterId, messages }: Props) {
           dedupe_key: row.dedupe_key,
         } as MemoryProposalRaw
         const key = memoryProposalKeyBrowser(proposal)
-        if (!pendingByKey.has(key)) {
+        const existing = pendingByKey.get(key)
+        if (!existing) {
           pendingByKey.set(key, {
             id: String(row.id),
             proposal,
             sourceBlock: Number(row.source_block ?? 0),
           })
+          return
         }
+
+        const merged = mergeMemoryProposalsBrowser(existing.proposal, proposal)
+        existing.proposal = merged
+        pendingByKey.set(key, existing)
+        if (existing.id) {
+          crossRunUpdatesById.set(existing.id, {
+            title: merged.title,
+            payload: merged.payload,
+            evidence: merged.evidence,
+            explanation: merged.explanation,
+            confidence: merged.confidence,
+            source_anchor: merged.source_anchor,
+            dedupe_key: key,
+          })
+        }
+        if (row.id) supersededPendingIds.push(String(row.id))
       })
+
+      for (const [proposalId, patch] of crossRunUpdatesById) {
+        const { error: mergeError } = await supabase
+          .from("memory_proposals")
+          .update(patch)
+          .eq("id", proposalId)
+          .eq("status", "pending")
+        if (mergeError)
+          throw new Error(`Não foi possível consolidar propostas anteriores: ${mergeError.message}`)
+      }
+
+      if (supersededPendingIds.length) {
+        const { error: supersedeError } = await supabase
+          .from("memory_proposals")
+          .update({
+            status: "superseded",
+            review_note: "Consolidada automaticamente com outra proposta pendente equivalente.",
+          })
+          .in("id", supersededPendingIds)
+          .eq("status", "pending")
+        if (supersedeError)
+          throw new Error(
+            `Não foi possível arquivar duplicatas pendentes: ${supersedeError.message}`,
+          )
+      }
 
       const canonicalEntityContext: ExistingMemoryEntity[] = (entityRows ?? []).map((row) => ({
         name: String(row.name ?? "").trim(),
@@ -1223,6 +1331,7 @@ export default function EditorialPanel({ bookId, chapterId, messages }: Props) {
             pendingByKey.set(key, existing)
             if (existing.id) {
               updatesById.set(existing.id, {
+                title: merged.title,
                 payload: merged.payload,
                 evidence: merged.evidence,
                 explanation: merged.explanation,

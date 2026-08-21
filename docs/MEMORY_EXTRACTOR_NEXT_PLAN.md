@@ -108,12 +108,14 @@ A implementação futura somente estará pronta quando:
 
 Não interromper nem modificar uma análise de produção em andamento. Usar o resultado atual como linha de base. Depois da conclusão, comparar a quantidade de entidades indevidas, atributos episódicos, aliases inválidos e evidências incorretas antes de implementar a Etapa A e reanalisar o primeiro capítulo.
 
-## Implementação V4 — contexto de entidade com memória de execução
+## Implementação V5 — contexto progressivo e reanálise incremental
 
-A implementação V4 mantém a aprovação humana como única entrada no cânone e adiciona memória progressiva durante a análise. Entidades canônicas são carregadas do Universo, propostas `entity` pendentes da execução atual são mescladas ao contexto e esse contexto é recalculado antes de cada bloco. Assim, uma entidade descoberta no bloco 1 pode ser enriquecida nos blocos seguintes sem perder resumo, aliases ou atributos estáveis complementares.
+A implementação V5 mantém a aprovação humana como única entrada no cânone e adiciona duas camadas de memória progressiva. Durante a mesma execução, entidades canônicas e propostas `entity` já encontradas são mescladas ao contexto antes de cada bloco. Em uma nova execução sobre a mesma versão aprovada, todas as propostas pendentes da versão são carregadas pela `dedupe_key`, consolidadas pela mesma função de merge e mantidas como uma única proposta pendente visível.
 
-A recuperação de entidades relevantes prioriza automaticamente, dentro do contexto enviado ao Ollama, nomes e aliases que aparecem no bloco corrente. Para análises futuras, entidades aprovadas no cânone são carregadas novamente pelo livro e voltam ao contexto quando reaparecem no texto. Propostas pendentes de execuções antigas não são tratadas como cânone; elas continuam sujeitas à decisão humana.
+Quando duas propostas pendentes equivalentes são encontradas entre execuções, a proposta mais antiga é preservada como registro principal e recebe a evidência, explicação, confiança, atributos e descrição complementares. A outra não é apagada: recebe status `superseded` e uma nota de consolidação. A interface filtra esse status para que os autores não vejam duplicatas, enquanto o histórico permanece no banco.
 
-Também foram aplicados o aumento do limite local para cinco propostas por bloco, a deduplicação de entidades por nome normalizado e a preservação de valores conflitantes de atributos em uma lista acompanhada de uma explicação para revisão humana. O contrato de fonte foi atualizado para `MEMORY_EXTRACTION_V4`.
+A recuperação de entidades relevantes prioriza automaticamente, dentro do contexto enviado ao Ollama, nomes e aliases que aparecem no bloco corrente. Entidades aprovadas no cânone continuam sendo carregadas em análises futuras; propostas pendentes anteriores podem orientar a consolidação da nova análise, mas não entram no cânone nem são tratadas como aprovadas.
 
-**Status:** Etapa A e consolidação stateful implementadas; validação de formatação, lint e build concluída.
+O limite local foi aumentado de cinco para oito propostas por bloco, permitindo que blocos com muitos personagens, relações e acontecimentos mantenham mais candidatos antes da aprovação humana. O contrato de fonte foi atualizado para `MEMORY_EXTRACTION_V5`.
+
+**Status:** consolidação stateful entre blocos e execuções implementada; validação de formatação, lint e build concluída.

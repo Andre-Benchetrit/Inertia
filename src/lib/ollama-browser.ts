@@ -57,24 +57,58 @@ export type CanonicalMemoryEntity = {
   id: string
   name: string
   aliases?: string[]
+  entity_type?: string
   summary?: string
+  knowledge_status?: "provisional" | "confirmed"
   attributes?: Record<string, unknown>
   visibility?: string
 }
 
 export type CanonicalMemoryFact = {
+  id?: string
   entity_id?: string | null
+  title?: string
   statement: string
+  fact_type?:
+    | "identity"
+    | "appearance"
+    | "origin"
+    | "occupation"
+    | "ability"
+    | "possession"
+    | "status"
+    | "knowledge"
+    | "condition"
+    | "world_rule"
+    | "lore"
+    | "other"
+  subject_entity?: string | null
+  related_entities?: string[]
+  scope?: "timeless" | "current" | "historical" | "temporary"
+  certainty?: "explicit_fact" | "direct_derivation" | "possible_inference" | "author_defined"
   evidence?: string
+  source_kind?: string
+  source_chapter_id?: string | null
+  source_version_id?: string | null
+  source_chapter_label?: string
+  source_version_label?: string
   visibility?: string
   status?: string
 }
 
 export type CanonicalMemoryRelation = {
+  id?: string
   from_entity_id: string
   to_entity_id: string
   relation_type: string
+  relation_status?: "active" | "former" | "unknown"
   description?: string
+  certainty?: "explicit_fact" | "direct_derivation" | "possible_inference" | "author_defined"
+  source_kind?: string
+  source_chapter_id?: string | null
+  source_version_id?: string | null
+  source_chapter_label?: string
+  source_version_label?: string
   visibility?: string
 }
 
@@ -85,6 +119,14 @@ export type CanonicalMemoryEvent = {
   event_kind?: string
   narrative_time?: string
   entity_ids?: string[]
+  participants?: Array<{ entity_name: string; role: string }>
+  outcomes?: string[]
+  certainty?: "explicit_fact" | "direct_derivation" | "possible_inference" | "author_defined"
+  source_kind?: string
+  source_chapter_id?: string | null
+  source_version_id?: string | null
+  source_chapter_label?: string
+  source_version_label?: string
   visibility?: string
   status?: string
 }
@@ -92,11 +134,27 @@ export type CanonicalMemoryEvent = {
 export type CanonicalMemoryOpenThread = {
   id: string
   title: string
+  question?: string
   description: string
+  thread_type?: string
   status?: string
+  thread_status?: string
   priority?: string
   entity_ids?: string[]
+  resolution?: Record<string, unknown> | null
+  certainty?: "explicit_fact" | "direct_derivation" | "possible_inference" | "author_defined"
+  source_kind?: string
+  source_chapter_id?: string | null
+  source_version_id?: string | null
+  source_chapter_label?: string
+  source_version_label?: string
   visibility?: string
+}
+
+export type CanonicalMemorySourceRef = {
+  record_type: "entity" | "fact" | "relation" | "event" | "open_thread"
+  record_id: string
+  source_role?: "approved_input" | "related_context"
 }
 
 export type CanonicalMemoryContext = {
@@ -105,6 +163,7 @@ export type CanonicalMemoryContext = {
   relations: CanonicalMemoryRelation[]
   events?: CanonicalMemoryEvent[]
   openThreads?: CanonicalMemoryOpenThread[]
+  approvedSources?: CanonicalMemorySourceRef[]
 }
 
 export type MemoryProposalRaw = {
@@ -156,7 +215,7 @@ export const MEMORY_BLOCK_CHARS = 4500
 const MEMORY_EXTRACTION_CONTEXT_TOKENS = 8192
 const MEMORY_EXTRACTION_OUTPUT_TOKENS = 4096
 const MEMORY_EXTRACTION_TIMEOUT_MS = 600000
-const MEMORY_MAX_PROPOSALS_PER_BLOCK = 5
+const MEMORY_MAX_PROPOSALS_PER_BLOCK = 8
 const MEMORY_EVIDENCE_CHARS = 260
 const MEMORY_EXPLANATION_CHARS = 180
 const MEMORY_SOURCE_ANCHOR_CHARS = 160
@@ -394,6 +453,19 @@ export function suggestionKeyBrowser(item: ReviewSuggestion) {
   return [item.suggestion_type, original || normalizePart(item.anchor), suggested].join("|")
 }
 
+function canonicalSourceLabel(item: {
+  source_kind?: string
+  source_chapter_label?: string
+  source_version_label?: string
+}) {
+  const parts = [
+    item.source_chapter_label,
+    item.source_version_label,
+    item.source_kind === "manuscript" ? "manuscrito" : item.source_kind === "author" ? "autor" : "",
+  ].filter(Boolean)
+  return parts.length ? ` Origem: ${parts.join(" — ")}.` : ""
+}
+
 export function buildReviewerContext(
   reviewText: string,
   memory: CanonicalMemoryContext,
@@ -477,14 +549,14 @@ export function buildReviewerContext(
   }
   for (const fact of relevantFacts) {
     lines.push(
-      `- Fato canônico: ${fact.statement}${fact.evidence ? ` Evidência: ${fact.evidence}` : ""}`,
+      `- Fato canônico: ${fact.statement}${fact.evidence ? ` Evidência: ${fact.evidence}` : ""}${canonicalSourceLabel(fact)}`,
     )
   }
   for (const relation of relevantRelations) {
     const from = entityNames.get(relation.from_entity_id) ?? "entidade de origem"
     const to = entityNames.get(relation.to_entity_id) ?? "entidade de destino"
     lines.push(
-      `- Relação canônica: ${from} — ${relation.relation_type} — ${to}.${relation.description ? ` ${relation.description}` : ""}`,
+      `- Relação canônica: ${from} — ${relation.relation_type} — ${to}.${relation.description ? ` ${relation.description}` : ""}${canonicalSourceLabel(relation)}`,
     )
   }
   for (const event of relevantEvents) {
@@ -493,7 +565,7 @@ export function buildReviewerContext(
       .filter(Boolean)
       .join(", ")
     lines.push(
-      `- Evento canônico: ${event.title}.${event.description ? ` ${event.description}` : ""}${event.narrative_time ? ` Quando: ${event.narrative_time}.` : ""}${involved ? ` Envolve: ${involved}.` : ""}`,
+      `- Evento canônico: ${event.title}.${event.description ? ` ${event.description}` : ""}${event.narrative_time ? ` Quando: ${event.narrative_time}.` : ""}${involved ? ` Envolve: ${involved}.` : ""}${canonicalSourceLabel(event)}`,
     )
   }
   for (const thread of relevantOpenThreads) {
@@ -502,7 +574,7 @@ export function buildReviewerContext(
       .filter(Boolean)
       .join(", ")
     lines.push(
-      `- Trama aberta canônica: ${thread.title}.${thread.description ? ` ${thread.description}` : ""}${thread.status ? ` Estado: ${thread.status}.` : ""}${involved ? ` Relacionada a: ${involved}.` : ""}`,
+      `- Trama aberta canônica: ${thread.title}.${thread.description ? ` ${thread.description}` : ""}${thread.status ? ` Estado: ${thread.status}.` : ""}${involved ? ` Relacionada a: ${involved}.` : ""}${canonicalSourceLabel(thread)}`,
     )
   }
 
@@ -1388,4 +1460,104 @@ export function mergeMemoryProposalsBrowser(
   }
 
   return { ...merged, dedupe_key: memoryProposalKeyBrowser(merged) }
+}
+
+
+export type CanonReconciliationAiResult = {
+  proposals: unknown[]
+  done_reason?: string
+}
+
+function reconciliationContextJson(context: CanonicalMemoryContext) {
+  const compact = {
+    entities: context.entities.slice(0, 160),
+    facts: context.facts.slice(0, 240),
+    relations: context.relations.slice(0, 240),
+    events: (context.events ?? []).slice(0, 160),
+    open_threads: (context.openThreads ?? []).slice(0, 160),
+    approved_sources: context.approvedSources ?? [],
+  }
+  return JSON.stringify(compact)
+}
+
+export function buildCanonReconciliationPrompt(
+  context: CanonicalMemoryContext,
+  deterministicCandidates: unknown[] = [],
+) {
+  const contextJson = reconciliationContextJson(context).slice(0, 115000)
+  const candidatesJson = JSON.stringify(deterministicCandidates.slice(0, 80)).slice(0, 24000)
+
+  return `Você é o Canon Reconciler de um Universo ficcional. Analise somente consequências estruturais diretamente sustentadas pelo cânone fornecido. Você NÃO está escrevendo a história, não está criando lore e não pode alterar o cânone. Sua saída será uma lista de propostas pendentes para revisão humana.
+
+Retorne somente JSON válido neste formato:
+{"schema_version":"universe-proposal-v5","proposals":[{"proposal_kind":"entity|fact|relation|event|open_thread","operation":"create|update|resolve|merge|archive","title":"...","target":{},"payload":{},"basis":[{"record_type":"fact","record_id":"UUID_EXISTENTE","role":"primary|supporting|conflict"}],"evidence_kind":"canon_record","evidence":"...","explanation":"...","certainty":"direct_derivation|possible_inference","confidence":0.0,"source_anchor":"...","dedupe_key":"..."}]}
+
+Regras obrigatórias:
+- Proponha somente consequências diretamente derivadas de registros canônicos presentes no CONTEXTO. Retorne proposals: [] quando não houver consequência estrutural segura.
+- Nunca invente UUID. Só use IDs existentes no contexto e em basis/target.
+- Não invente nomes, poderes, motivações, relações românticas, cronologia ou resolução de mistérios por teoria.
+- Uma inferência possível deve usar certainty=possible_inference e nunca deve ser aplicada automaticamente; prefira não propor inferências fracas.
+- Para relação, use payload.relation_type controlado: friend_of, sibling_of, parent_of, child_of, enemy_of, allied_with, member_of, owns, equipped_with, has_power, located_in, created_by, uses, associated_with ou other.
+- Para posse ou equipamento, não trate uma ação temporária como posse permanente. Para perda, prefira relation_status=former ou uma atualização histórica; nunca apague a relação.
+- Se um item, poder ou personagem for necessário para uma consequência diretamente sustentada e não existir, proponha entity/create com knowledge_status=provisional e atributos mínimos. Não invente detalhes.
+- Se uma thread aberta for respondida diretamente, proponha open_thread/resolve com target.record_id da thread e resolution.resolved_by referenciando os fatos/eventos usados. Similaridade temática não basta.
+- Se dois fatos parecerem conflitantes, proponha um alerta estruturado para revisão humana sem decidir qual é verdadeiro. Não arquive nenhum fato automaticamente.
+- Preserve a normalização: equipamentos, poderes, afiliações e família devem ser relações, não arrays dentro de entity.attributes.
+- Toda proposta deve ter basis com referências aos registros do contexto, evidence curta e fiel ao registro canônico, explanation curta, source_anchor e dedupe_key estável.
+- Nunca proponha uma alteração semanticamente equivalente a uma relação, entidade, evento ou thread já existente, salvo quando a operação for update, resolve, archive ou merge.
+- O campo confidence é a confiança da análise, não canonização.
+
+CONTEXTO CANÔNICO V5:
+${contextJson}
+
+CANDIDATOS DETERMINÍSTICOS PARA VALIDAR OU COMPLEMENTAR:
+${candidatesJson}
+
+Se os candidatos já cobrirem todas as consequências diretas, retorne somente as propostas adicionais que estejam faltando.`
+}
+
+export async function reconcileCanonWithOllama(
+  model: string,
+  context: CanonicalMemoryContext,
+  deterministicCandidates: unknown[] = [],
+): Promise<CanonReconciliationAiResult> {
+  const raw = await request<{ response?: string; done_reason?: string }>(
+    "/api/generate",
+    {
+      method: "POST",
+      body: JSON.stringify({
+        model,
+        prompt: buildCanonReconciliationPrompt(context, deterministicCandidates),
+        stream: false,
+        think: false,
+        format: "json",
+        options: {
+          num_predict: 6144,
+          temperature: 0.1,
+          num_ctx: AI_INSTRUCTIONS_CONTEXT_TOKENS,
+        },
+      }),
+    },
+    600000,
+  )
+
+  if (raw.done_reason === "length")
+    throw new OllamaError(
+      "O Ollama atingiu o limite ao analisar as consequências do cânone.",
+      "OLLAMA_OUTPUT_LIMIT",
+    )
+
+  let parsed: unknown
+  try {
+    parsed = JSON.parse(raw.response ?? "{}")
+  } catch {
+    throw new OllamaError(
+      "A resposta do Canon Reconciler não veio em JSON válido.",
+      "OLLAMA_INVALID_JSON",
+    )
+  }
+
+  const value = asObject(parsed)
+  const proposals = Array.isArray(value.proposals) ? value.proposals : []
+  return { proposals, done_reason: raw.done_reason }
 }
