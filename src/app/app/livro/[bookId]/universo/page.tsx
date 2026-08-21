@@ -3,10 +3,15 @@
 import Link from "next/link"
 import { useParams, useSearchParams } from "next/navigation"
 import { useEffect, useMemo, useState } from "react"
-import { translateMemoryProposalToPortuguese } from "@/lib/ollama-browser"
+import {
+  translateMemoryProposalToPortuguese,
+  type CanonicalMemoryContext,
+} from "@/lib/ollama-browser"
+import CanonReconciliationPanel from "./CanonReconciliationPanel"
+import { type ReconciliationSource } from "@/lib/canon-reconciler-browser"
 import { createSupabaseBrowserClient } from "@/lib/supabase-browser"
 
-type Tab = "entities" | "facts" | "relations" | "events" | "threads" | "analysis"
+type Tab = "entities" | "facts" | "relations" | "events" | "threads" | "analysis" | "reconciliation"
 type EntityType =
   | "character"
   | "location"
@@ -33,6 +38,7 @@ type Entity = {
 type CanonFact = {
   id: string
   entity_id: string | null
+  title: string
   statement: string
   evidence: string
   visibility: Visibility
@@ -118,17 +124,23 @@ type MemoryProposal = {
   approved_records: Array<Record<string, unknown>> | null
 }
 
+type AttributeRow = {
+  key: string
+  value: string
+}
+
 type EntityDraft = {
   name: string
   entity_type: EntityType
   summary: string
   aliases: string
-  attributes: string
+  attributes: AttributeRow[]
   visibility: Visibility
 }
 
 type FactDraft = {
   entity_id: string
+  title: string
   statement: string
   evidence: string
   visibility: Visibility
@@ -201,12 +213,13 @@ const emptyEntityDraft: EntityDraft = {
   entity_type: "character",
   summary: "",
   aliases: "",
-  attributes: "{}",
+  attributes: [{ key: "", value: "" }],
   visibility: "canon",
 }
 
 const emptyFactDraft: FactDraft = {
   entity_id: "",
+  title: "",
   statement: "",
   evidence: "",
   visibility: "canon",
@@ -272,6 +285,52 @@ function textList(value: unknown) {
     .filter((item): item is string => typeof item === "string")
     .map((item) => item.trim())
     .filter(Boolean)
+}
+
+function attributeRowsFromValue(value: unknown): AttributeRow[] {
+  if (!isRecord(value)) return [{ key: "", value: "" }]
+  const rows = Object.entries(value).map(([key, item]) => ({
+    key,
+    value: typeof item === "string" ? item : JSON.stringify(item),
+  }))
+  return rows.length ? rows : [{ key: "", value: "" }]
+}
+
+function attributeValueFromRows(rows: AttributeRow[]) {
+  return rows.reduce<Record<string, unknown>>((result, row) => {
+    const key = row.key.trim()
+    const value = row.value.trim()
+    if (!key || !value) return result
+    try {
+      result[key] = JSON.parse(value)
+    } catch {
+      result[key] = value
+    }
+    return result
+  }, {})
+}
+
+function matchesSearch(query: string, ...values: unknown[]) {
+  const normalizedQuery = query.trim().toLocaleLowerCase()
+  if (!normalizedQuery) return true
+  return values.some((value) =>
+    String(value ?? "")
+      .toLocaleLowerCase()
+      .includes(normalizedQuery),
+  )
+}
+
+function JsonDisclosure({ value }: { value: unknown }) {
+  return (
+    <details className="mt-3 rounded-xl bg-white/70 p-3">
+      <summary className="cursor-pointer text-xs font-semibold text-[#65735f]">
+        Ver JSON completo
+      </summary>
+      <pre className="mt-2 max-h-80 overflow-auto whitespace-pre-wrap break-words text-xs leading-5 text-[#52614e]">
+        {JSON.stringify(value, null, 2)}
+      </pre>
+    </details>
+  )
 }
 
 function eventPayloadView(event: TimelineEvent) {
@@ -360,7 +419,11 @@ export default function UniversePage() {
   const [proposals, setProposals] = useState<MemoryProposal[]>([])
   const [analysisError, setAnalysisError] = useState("")
   const [activeTab, setActiveTab] = useState<Tab>(() =>
-    searchParams.get("tab") === "analysis" ? "analysis" : "entities",
+    searchParams.get("tab") === "analysis"
+      ? "analysis"
+      : searchParams.get("tab") === "reconciliation"
+        ? "reconciliation"
+        : "entities",
   )
   const [entityDraft, setEntityDraft] = useState<EntityDraft>(emptyEntityDraft)
   const [factDraft, setFactDraft] = useState<FactDraft>(emptyFactDraft)
@@ -382,25 +445,283 @@ export default function UniversePage() {
   const [saving, setSaving] = useState(false)
   const [proposalActionId, setProposalActionId] = useState<string | null>(null)
   const [editingProposalId, setEditingProposalId] = useState<string | null>(null)
+  const [proposalEditTitle, setProposalEditTitle] = useState("")
   const [proposalEditPayload, setProposalEditPayload] = useState("{}")
   const [translatingProposals, setTranslatingProposals] = useState(false)
   const [translationProgress, setTranslationProgress] = useState({ done: 0, total: 0 })
+  const [entitySearch, setEntitySearch] = useState("")
+  const [entityTypeFilter, setEntityTypeFilter] = useState<EntityType | "all">("all")
+  const [factSearch, setFactSearch] = useState("")
+  const [factEntityFilter, setFactEntityFilter] = useState("all")
+  const [relationSearch, setRelationSearch] = useState("")
+  const [relationTypeFilter, setRelationTypeFilter] = useState("all")
+  const [eventSearch, setEventSearch] = useState("")
+  const [eventKindFilter, setEventKindFilter] = useState<EventKind | "all">("all")
+  const [eventEntityFilter, setEventEntityFilter] = useState("all")
+  const [threadSearch, setThreadSearch] = useState("")
+  const [threadEntityFilter, setThreadEntityFilter] = useState("all")
+  const [threadStatusFilter, setThreadStatusFilter] = useState<OpenThreadStatus | "all">("all")
+  const [threadPriorityFilter, setThreadPriorityFilter] = useState<ThreadPriority | "all">("all")
+  const [proposalSearch, setProposalSearch] = useState("")
+  const [proposalKindFilter, setProposalKindFilter] = useState<
+    MemoryProposal["proposal_kind"] | "all"
+  >("all")
+  const [proposalIndex, setProposalIndex] = useState(0)
+  const [reconciliationPendingCount, setReconciliationPendingCount] = useState(0)
   const [error, setError] = useState("")
   const [notice, setNotice] = useState("")
+
+  const approvedReconciliationSources = useMemo<ReconciliationSource[]>(() => {
+    const byKey = new Map<string, ReconciliationSource>()
+    const resultKeys: Array<[string, ReconciliationSource["record_type"]]> = [
+      ["entity_id", "entity"],
+      ["fact_id", "fact"],
+      ["relation_id", "relation"],
+      ["event_id", "event"],
+      ["thread_id", "open_thread"],
+      ["open_thread_id", "open_thread"],
+    ]
+    for (const proposal of proposals) {
+      if (proposal.status !== "approved") continue
+      for (const record of proposal.approved_records ?? []) {
+        const directType = record.record_type
+        const directId = record.record_id
+        if (
+          (directType === "entity" ||
+            directType === "fact" ||
+            directType === "relation" ||
+            directType === "event" ||
+            directType === "open_thread") &&
+          typeof directId === "string" &&
+          directId.trim()
+        ) {
+          const source: ReconciliationSource = {
+            record_type: directType,
+            record_id: directId,
+            source_role: "approved_input",
+          }
+          byKey.set(`${source.record_type}:${source.record_id}`, source)
+          continue
+        }
+        for (const [key, recordType] of resultKeys) {
+          const recordId = record[key]
+          if (typeof recordId !== "string" || !recordId.trim()) continue
+          const source: ReconciliationSource = {
+            record_type: recordType,
+            record_id: recordId,
+            source_role: "approved_input",
+          }
+          byKey.set(`${source.record_type}:${source.record_id}`, source)
+        }
+      }
+    }
+    return [...byKey.values()]
+  }, [proposals])
+
+  const reconciliationContext = useMemo<CanonicalMemoryContext>(
+    () => ({
+      entities: entities.map((entity) => ({
+        id: entity.id,
+        name: entity.name,
+        entity_type: entity.entity_type,
+        aliases: entity.aliases,
+        summary: entity.summary,
+        attributes: entity.attributes,
+        knowledge_status: "confirmed" as const,
+        visibility: entity.visibility,
+      })),
+      facts: facts.map((fact) => ({
+        id: fact.id,
+        entity_id: fact.entity_id,
+        subject_entity: fact.entity_id ? entityById.get(fact.entity_id)?.name ?? null : null,
+        title: fact.title,
+        statement: fact.statement,
+        evidence: fact.evidence,
+        source_kind: "author",
+        certainty: "explicit_fact" as const,
+        visibility: fact.visibility,
+        status: fact.status,
+      })),
+      relations: relations.map((relation) => ({
+        id: relation.id,
+        from_entity_id: relation.from_entity_id,
+        to_entity_id: relation.to_entity_id,
+        relation_type: relation.relation_type,
+        relation_status: relation.archived_at ? "former" as const : "active" as const,
+        description: relation.description,
+        source_kind: "author",
+        certainty: "explicit_fact" as const,
+        visibility: relation.visibility,
+      })),
+      events: events.map((event) => ({
+        id: event.id,
+        title: event.title,
+        description: event.description,
+        event_kind: event.event_kind,
+        narrative_time: event.narrative_time,
+        entity_ids: event.entity_ids,
+        outcomes: Array.isArray(event.payload?.outcomes)
+          ? event.payload.outcomes.filter((item): item is string => typeof item === "string")
+          : [],
+        participants: Array.isArray(event.payload?.participants)
+          ? event.payload.participants.filter(
+              (item): item is { entity_name: string; role: string } =>
+                Boolean(item) &&
+                typeof item === "object" &&
+                typeof (item as { entity_name?: unknown }).entity_name === "string" &&
+                typeof (item as { role?: unknown }).role === "string",
+            )
+          : [],
+        certainty: "explicit_fact" as const,
+        source_kind: "author",
+        visibility: event.visibility,
+        status: event.status,
+      })),
+      openThreads: openThreads.map((thread) => ({
+        id: thread.id,
+        title: thread.title,
+        question:
+          typeof (thread as OpenThread & { question?: unknown }).question === "string"
+            ? (thread as OpenThread & { question: string }).question
+            : thread.title,
+        description: thread.description,
+        thread_type: "other",
+        thread_status: thread.status,
+        status: thread.status,
+        priority: thread.priority,
+        entity_ids: thread.entity_ids,
+        certainty: "explicit_fact" as const,
+        source_kind: "author",
+        visibility: thread.visibility,
+      })),
+    }),
+    [entities, events, facts, openThreads, relations],
+  )
 
   const entityById = useMemo(
     () => new Map(entities.map((entity) => [entity.id, entity])),
     [entities],
   )
-  const pendingProposalCount = useMemo(
-    () => proposals.filter((proposal) => proposal.status === "pending").length,
+  const pendingProposals = useMemo(
+    () => proposals.filter((proposal) => proposal.status === "pending"),
     [proposals],
   )
+  const filteredEntities = useMemo(
+    () =>
+      entities.filter(
+        (entity) =>
+          (entityTypeFilter === "all" || entity.entity_type === entityTypeFilter) &&
+          matchesSearch(entitySearch, entity.name, entity.summary, entity.aliases.join(" ")),
+      ),
+    [entities, entitySearch, entityTypeFilter],
+  )
+  const filteredFacts = useMemo(
+    () =>
+      facts.filter(
+        (fact) =>
+          (factEntityFilter === "all" || fact.entity_id === factEntityFilter) &&
+          matchesSearch(factSearch, fact.title, fact.statement, fact.evidence),
+      ),
+    [facts, factEntityFilter, factSearch],
+  )
+  const relationTypes = useMemo(
+    () =>
+      Array.from(
+        new Set(relations.map((relation) => relation.relation_type).filter(Boolean)),
+      ).sort(),
+    [relations],
+  )
+  const filteredRelations = useMemo(
+    () =>
+      relations.filter((relation) => {
+        const fromName = entityById.get(relation.from_entity_id)?.name || "Entidade arquivada"
+        const toName = entityById.get(relation.to_entity_id)?.name || "Entidade arquivada"
+        return (
+          (relationTypeFilter === "all" || relation.relation_type === relationTypeFilter) &&
+          matchesSearch(
+            relationSearch,
+            fromName,
+            toName,
+            relation.relation_type,
+            relation.description,
+          )
+        )
+      }),
+    [entityById, relationSearch, relationTypeFilter, relations],
+  )
+  const filteredEvents = useMemo(
+    () =>
+      events.filter((event) => {
+        const view = eventPayloadView(event)
+        return (
+          (eventKindFilter === "all" || view.kind === eventKindFilter) &&
+          (eventEntityFilter === "all" || event.entity_ids.includes(eventEntityFilter)) &&
+          matchesSearch(
+            eventSearch,
+            view.title,
+            view.description,
+            view.narrativeTime,
+            view.entityNames.join(" "),
+          )
+        )
+      }),
+    [eventEntityFilter, eventKindFilter, eventSearch, events],
+  )
+  const filteredThreads = useMemo(
+    () =>
+      openThreads.filter(
+        (thread) =>
+          (threadStatusFilter === "all" || thread.status === threadStatusFilter) &&
+          (threadPriorityFilter === "all" || thread.priority === threadPriorityFilter) &&
+          (threadEntityFilter === "all" || thread.entity_ids.includes(threadEntityFilter)) &&
+          matchesSearch(
+            threadSearch,
+            thread.title,
+            thread.description,
+            thread.entity_ids.map((entityId) => entityById.get(entityId)?.name || "").join(" "),
+          ),
+      ),
+    [
+      entityById,
+      openThreads,
+      threadEntityFilter,
+      threadPriorityFilter,
+      threadSearch,
+      threadStatusFilter,
+    ],
+  )
+  const filteredProposals = useMemo(
+    () =>
+      pendingProposals.filter(
+        (proposal) =>
+          (proposalKindFilter === "all" || proposal.proposal_kind === proposalKindFilter) &&
+          matchesSearch(
+            proposalSearch,
+            proposal.title,
+            proposal.explanation,
+            proposal.evidence,
+            proposal.proposal_kind,
+          ),
+      ),
+    [pendingProposals, proposalKindFilter, proposalSearch],
+  )
+  const pendingProposalCount = pendingProposals.length
 
-  async function load() {
-    setLoading(true)
-    setError("")
-    setAnalysisError("")
+  useEffect(() => {
+    // The filtered carousel must clamp its position after a filter change.
+    // eslint-disable-next-line react-hooks/set-state-in-effect
+    setProposalIndex((current) =>
+      filteredProposals.length ? Math.min(current, filteredProposals.length - 1) : 0,
+    )
+  }, [filteredProposals.length])
+
+  async function load(options: { silent?: boolean } = {}) {
+    const silent = options.silent === true
+    if (!silent) {
+      setLoading(true)
+      setError("")
+      setAnalysisError("")
+    }
     const analysisChapterId = searchParams.get("chapterId")
     const runsQuery = supabase
       .from("memory_analysis_runs")
@@ -416,6 +737,7 @@ export default function UniversePage() {
         "id,run_id,chapter_id,version_id,proposal_kind,status,confidence,title,payload,evidence,explanation,source_block,source_anchor,review_note,approved_records,created_at",
       )
       .eq("book_id", bookId)
+      .neq("status", "superseded")
       .order("created_at", { ascending: false })
       .limit(200)
     if (analysisChapterId) {
@@ -445,7 +767,7 @@ export default function UniversePage() {
         .order("name"),
       supabase
         .from("canon_facts")
-        .select("id,entity_id,statement,evidence,visibility,status,archived_at")
+        .select("id,entity_id,title,statement,evidence,visibility,status,archived_at")
         .eq("book_id", bookId)
         .is("archived_at", null)
         .neq("status", "archived")
@@ -546,7 +868,12 @@ export default function UniversePage() {
       setAnalysisRun(loadedRuns[0] ?? null)
       setProposals((proposalsResult.data || []) as MemoryProposal[])
     }
-    setLoading(false)
+    if (!silent) setLoading(false)
+  }
+
+  function removeProposalLocally(proposalId: string) {
+    setProposals((current) => current.filter((proposal) => proposal.id !== proposalId))
+    setProposalIndex((current) => Math.min(current, Math.max(0, filteredProposals.length - 2)))
   }
 
   useEffect(() => {
@@ -625,12 +952,49 @@ export default function UniversePage() {
   function startProposalEdit(proposal: MemoryProposal) {
     clearFeedback()
     setEditingProposalId(proposal.id)
+    setProposalEditTitle(proposal.title)
     setProposalEditPayload(JSON.stringify(proposal.payload || {}, null, 2))
   }
 
   function cancelProposalEdit() {
     setEditingProposalId(null)
+    setProposalEditTitle("")
     setProposalEditPayload("{}")
+  }
+
+  async function saveProposalEdit(proposal: MemoryProposal) {
+    let parsedPayload: Record<string, unknown>
+    const title = proposalEditTitle.trim()
+    try {
+      const parsed = JSON.parse(proposalEditPayload || "{}")
+      if (!parsed || typeof parsed !== "object" || Array.isArray(parsed)) throw new Error()
+      parsedPayload = { ...(parsed as Record<string, unknown>), title }
+    } catch {
+      setError("O payload editado precisa ser um objeto JSON válido.")
+      return
+    }
+    if (!title) {
+      setError("A sugestão precisa ter um título.")
+      return
+    }
+
+    setProposalActionId(proposal.id)
+    clearFeedback()
+    try {
+      const result = await supabase
+        .from("memory_proposals")
+        .update({ title, payload: parsedPayload })
+        .eq("id", proposal.id)
+        .eq("status", "pending")
+      if (result.error) throw new Error(result.error.message)
+      setNotice("Título e dados da sugestão atualizados.")
+      cancelProposalEdit()
+      void load({ silent: true })
+    } catch (caught) {
+      setError(caught instanceof Error ? caught.message : "Não foi possível salvar a sugestão.")
+    } finally {
+      setProposalActionId(null)
+    }
   }
 
   async function approveProposal(proposal: MemoryProposal) {
@@ -639,13 +1003,18 @@ export default function UniversePage() {
       try {
         const parsed = JSON.parse(proposalEditPayload || "{}")
         if (!parsed || typeof parsed !== "object" || Array.isArray(parsed)) throw new Error()
-        editedPayload = parsed as Record<string, unknown>
+        editedPayload = {
+          ...(parsed as Record<string, unknown>),
+          title: proposalEditTitle.trim() || proposal.title,
+        }
       } catch {
         setError("O payload editado precisa ser um objeto JSON válido.")
         return
       }
     }
 
+    const previousProposals = proposals
+    removeProposalLocally(proposal.id)
     setProposalActionId(proposal.id)
     clearFeedback()
     const result = await supabase.rpc("approve_memory_proposal", {
@@ -653,11 +1022,12 @@ export default function UniversePage() {
       edited_payload: editedPayload,
     })
     if (result.error) {
+      setProposals(previousProposals)
       setError("Não foi possível adicionar a proposta ao Universo: " + result.error.message)
     } else {
       setNotice("Proposta adicionada ao Universo canônico. A decisão ficou registrada.")
       cancelProposalEdit()
-      await load()
+      void load({ silent: true })
     }
     setProposalActionId(null)
   }
@@ -696,6 +1066,8 @@ export default function UniversePage() {
 
   async function rejectProposal(proposal: MemoryProposal) {
     if (!window.confirm(`Ignorar a proposta “${proposal.title}”?`)) return
+    const previousProposals = proposals
+    removeProposalLocally(proposal.id)
     setProposalActionId(proposal.id)
     clearFeedback()
     const result = await supabase.rpc("reject_memory_proposal", {
@@ -703,10 +1075,11 @@ export default function UniversePage() {
       review_note: "Ignorada pelos autores.",
     })
     if (result.error) {
+      setProposals(previousProposals)
       setError("Não foi possível ignorar a proposta: " + result.error.message)
     } else {
       setNotice("Proposta ignorada. Ela não foi adicionada ao Universo.")
-      await load()
+      void load({ silent: true })
     }
     setProposalActionId(null)
   }
@@ -726,7 +1099,7 @@ export default function UniversePage() {
       entity_type: entity.entity_type,
       summary: entity.summary,
       aliases: entity.aliases.join(", "),
-      attributes: JSON.stringify(entity.attributes || {}, null, 2),
+      attributes: attributeRowsFromValue(entity.attributes),
       visibility: entity.visibility,
     })
     setShowEntityForm(true)
@@ -746,15 +1119,7 @@ export default function UniversePage() {
       return
     }
 
-    let attributes: Record<string, unknown> = {}
-    try {
-      const parsed = JSON.parse(entityDraft.attributes || "{}")
-      if (!parsed || typeof parsed !== "object" || Array.isArray(parsed)) throw new Error()
-      attributes = parsed as Record<string, unknown>
-    } catch {
-      setError('Atributos devem ser um objeto JSON válido, como {"idade": 32}.')
-      return
-    }
+    const attributes = attributeValueFromRows(entityDraft.attributes)
 
     const aliases = entityDraft.aliases
       .split(/[\n,]/)
@@ -815,6 +1180,7 @@ export default function UniversePage() {
     setEditingFactId(fact.id)
     setFactDraft({
       entity_id: fact.entity_id || "",
+      title: fact.title || "",
       statement: fact.statement,
       evidence: fact.evidence,
       visibility: fact.visibility,
@@ -830,6 +1196,7 @@ export default function UniversePage() {
 
   async function saveFact() {
     if (!userId) return
+    const title = factDraft.title.trim()
     const statement = factDraft.statement.trim()
     if (!statement) {
       setError("Escreva o fato que deve ser preservado no Universo.")
@@ -839,6 +1206,7 @@ export default function UniversePage() {
     clearFeedback()
     const payload = {
       entity_id: factDraft.entity_id || null,
+      title,
       statement,
       evidence: factDraft.evidence.trim(),
       visibility: factDraft.visibility,
@@ -1259,7 +1627,8 @@ export default function UniversePage() {
                 ["relations", "Relações", relations.length],
                 ["events", "Eventos", events.length],
                 ["threads", "Tramas abertas", openThreads.length],
-                ["analysis", "Propostas", proposals.length],
+                ["analysis", "Pendentes", pendingProposalCount],
+                ["reconciliation", "Reconciliação", reconciliationPendingCount],
               ] as const
             ).map(([tab, label, count]) => (
               <button
@@ -1380,21 +1749,79 @@ export default function UniversePage() {
                         </select>
                       </label>
                     </div>
-                    <label className="mt-3 block text-sm font-semibold">
-                      Atributos flexíveis em JSON
-                      <textarea
-                        value={entityDraft.attributes}
-                        onChange={(event) =>
+                    <div className="mt-3 rounded-xl border border-[#d5c9bd] bg-white p-3">
+                      <p className="text-sm font-semibold">Atributos principais</p>
+                      <p className="mt-1 text-xs font-normal leading-5 text-[#8b887f]">
+                        Use campos simples para registrar informações estáveis. Valores numéricos,
+                        booleanos e listas também podem ser escritos em JSON no campo de valor.
+                      </p>
+                      <div className="mt-3 space-y-2">
+                        {entityDraft.attributes.map((attribute, index) => (
+                          <div key={`attribute-${index}`} className="flex flex-wrap gap-2">
+                            <input
+                              value={attribute.key}
+                              onChange={(event) =>
+                                setEntityDraft((current) => ({
+                                  ...current,
+                                  attributes: current.attributes.map((item, itemIndex) =>
+                                    itemIndex === index
+                                      ? { ...item, key: event.target.value }
+                                      : item,
+                                  ),
+                                }))
+                              }
+                              placeholder="Campo, ex.: olhos"
+                              className="min-w-36 flex-1 rounded-lg border border-[#d5c9bd] px-3 py-2 text-sm font-normal outline-none focus:border-[#8d6d4c]"
+                            />
+                            <input
+                              value={attribute.value}
+                              onChange={(event) =>
+                                setEntityDraft((current) => ({
+                                  ...current,
+                                  attributes: current.attributes.map((item, itemIndex) =>
+                                    itemIndex === index
+                                      ? { ...item, value: event.target.value }
+                                      : item,
+                                  ),
+                                }))
+                              }
+                              placeholder="Valor, ex.: verdes"
+                              className="min-w-36 flex-[2] rounded-lg border border-[#d5c9bd] px-3 py-2 text-sm font-normal outline-none focus:border-[#8d6d4c]"
+                            />
+                            <button
+                              type="button"
+                              onClick={() =>
+                                setEntityDraft((current) => ({
+                                  ...current,
+                                  attributes:
+                                    current.attributes.length > 1
+                                      ? current.attributes.filter(
+                                          (_, itemIndex) => itemIndex !== index,
+                                        )
+                                      : [{ key: "", value: "" }],
+                                }))
+                              }
+                              className="rounded-lg px-2 text-xs font-semibold text-[#8d493b] hover:bg-[#fbe8e3]"
+                              aria-label="Remover atributo"
+                            >
+                              Remover
+                            </button>
+                          </div>
+                        ))}
+                      </div>
+                      <button
+                        type="button"
+                        onClick={() =>
                           setEntityDraft((current) => ({
                             ...current,
-                            attributes: event.target.value,
+                            attributes: [...current.attributes, { key: "", value: "" }],
                           }))
                         }
-                        rows={3}
-                        className="mt-1 w-full resize-y rounded-xl border border-[#d5c9bd] bg-white px-3 py-2 font-mono text-xs font-normal leading-5 outline-none focus:border-[#8d6d4c]"
-                        placeholder={'{"idade": 32, "olhos": "verdes"}'}
-                      />
-                    </label>
+                        className="mt-3 text-xs font-semibold text-[#65735f] underline underline-offset-2"
+                      >
+                        + Adicionar atributo
+                      </button>
+                    </div>
                     <div className="mt-4 flex justify-end gap-2">
                       <button
                         type="button"
@@ -1416,13 +1843,45 @@ export default function UniversePage() {
                   </div>
                 )}
 
+                <div className="mt-5 rounded-2xl border border-[#e3d8cc] bg-white/70 p-3">
+                  <div className="flex flex-wrap items-center gap-2">
+                    <input
+                      value={entitySearch}
+                      onChange={(event) => setEntitySearch(event.target.value)}
+                      placeholder="Buscar por nome, resumo ou apelido"
+                      className="min-w-48 flex-1 rounded-lg border border-[#d5c9bd] bg-white px-3 py-2 text-sm outline-none focus:border-[#8d6d4c]"
+                      aria-label="Buscar entidades"
+                    />
+                    <select
+                      value={entityTypeFilter}
+                      onChange={(event) =>
+                        setEntityTypeFilter(event.target.value as EntityType | "all")
+                      }
+                      className="rounded-lg border border-[#d5c9bd] bg-white px-3 py-2 text-sm outline-none focus:border-[#8d6d4c]"
+                      aria-label="Filtrar entidades por tipo"
+                    >
+                      <option value="all">Todos os tipos</option>
+                      {Object.entries(entityTypeLabels).map(([value, label]) => (
+                        <option key={value} value={value}>
+                          {label}
+                        </option>
+                      ))}
+                    </select>
+                    <span className="text-xs text-[#8b887f]">
+                      {filteredEntities.length} de {entities.length}
+                    </span>
+                  </div>
+                </div>
+
                 <div className="mt-5 space-y-3">
-                  {entities.length === 0 ? (
+                  {filteredEntities.length === 0 ? (
                     <p className="rounded-2xl bg-[#f6f1ea] p-5 text-sm text-[#687065]">
-                      Nenhuma entidade registrada ainda.
+                      {entities.length === 0
+                        ? "Nenhuma entidade registrada ainda."
+                        : "Nenhuma entidade corresponde aos filtros atuais."}
                     </p>
                   ) : (
-                    entities.map((entity) => (
+                    filteredEntities.map((entity) => (
                       <article key={entity.id} className="rounded-2xl bg-[#f6f1ea] p-4">
                         <div className="flex items-start justify-between gap-3">
                           <div className="min-w-0">
@@ -1447,6 +1906,16 @@ export default function UniversePage() {
                                 Também: {entity.aliases.join(", ")}
                               </p>
                             )}
+                            <JsonDisclosure
+                              value={{
+                                name: entity.name,
+                                entity_type: entity.entity_type,
+                                summary: entity.summary,
+                                aliases: entity.aliases,
+                                attributes: entity.attributes,
+                                visibility: entity.visibility,
+                              }}
+                            />
                           </div>
                           <div className="flex shrink-0 gap-2">
                             <button
@@ -1520,6 +1989,18 @@ export default function UniversePage() {
                       </select>
                     </label>
                     <label className="mt-3 block text-sm font-semibold">
+                      Título do fato
+                      <input
+                        value={factDraft.title}
+                        onChange={(event) =>
+                          setFactDraft((current) => ({ ...current, title: event.target.value }))
+                        }
+                        maxLength={240}
+                        className="mt-1 w-full rounded-xl border border-[#d5c9bd] bg-white px-3 py-2 font-normal outline-none focus:border-[#8d6d4c]"
+                        placeholder="Ex.: Limitação de Lira"
+                      />
+                    </label>
+                    <label className="mt-3 block text-sm font-semibold">
                       Fato
                       <textarea
                         value={factDraft.statement}
@@ -1582,17 +2063,51 @@ export default function UniversePage() {
                     </div>
                   </div>
                 )}
+                <div className="mt-5 rounded-2xl border border-[#e3d8cc] bg-white/70 p-3">
+                  <div className="flex flex-wrap items-center gap-2">
+                    <input
+                      value={factSearch}
+                      onChange={(event) => setFactSearch(event.target.value)}
+                      placeholder="Buscar por afirmação ou evidência"
+                      className="min-w-48 flex-1 rounded-lg border border-[#d5c9bd] bg-white px-3 py-2 text-sm outline-none focus:border-[#8d6d4c]"
+                      aria-label="Buscar fatos"
+                    />
+                    <select
+                      value={factEntityFilter}
+                      onChange={(event) => setFactEntityFilter(event.target.value)}
+                      className="max-w-full rounded-lg border border-[#d5c9bd] bg-white px-3 py-2 text-sm outline-none focus:border-[#8d6d4c]"
+                      aria-label="Filtrar fatos por entidade"
+                    >
+                      <option value="all">Todas as entidades</option>
+                      <option value="">Fatos gerais da obra</option>
+                      {entities.map((entity) => (
+                        <option key={entity.id} value={entity.id}>
+                          {entity.name}
+                        </option>
+                      ))}
+                    </select>
+                    <span className="text-xs text-[#8b887f]">
+                      {filteredFacts.length} de {facts.length}
+                    </span>
+                  </div>
+                </div>
+
                 <div className="mt-5 space-y-3">
-                  {facts.length === 0 ? (
+                  {filteredFacts.length === 0 ? (
                     <p className="rounded-2xl bg-[#f6f1ea] p-5 text-sm text-[#687065]">
-                      Nenhum fato registrado ainda.
+                      {facts.length === 0
+                        ? "Nenhum fato registrado ainda."
+                        : "Nenhum fato corresponde aos filtros atuais."}
                     </p>
                   ) : (
-                    facts.map((fact) => (
+                    filteredFacts.map((fact) => (
                       <article key={fact.id} className="rounded-2xl bg-[#f6f1ea] p-4">
                         <div className="flex items-start justify-between gap-3">
                           <div>
-                            <p className="leading-6">{fact.statement}</p>
+                            {fact.title && (
+                              <h3 className="text-base font-semibold">{fact.title}</h3>
+                            )}
+                            <p className="mt-1 leading-6">{fact.statement}</p>
                             <p className="mt-2 text-xs text-[#8b887f]">
                               {fact.entity_id
                                 ? entityById.get(fact.entity_id)?.name || "Entidade arquivada"
@@ -1604,6 +2119,16 @@ export default function UniversePage() {
                                 Evidência: {fact.evidence}
                               </p>
                             )}
+                            <JsonDisclosure
+                              value={{
+                                entity_id: fact.entity_id,
+                                title: fact.title,
+                                statement: fact.statement,
+                                evidence: fact.evidence,
+                                visibility: fact.visibility,
+                                status: fact.status,
+                              }}
+                            />
                           </div>
                           <div className="flex shrink-0 gap-2">
                             <button
@@ -1765,13 +2290,43 @@ export default function UniversePage() {
                     </div>
                   </div>
                 )}
+                <div className="mt-5 rounded-2xl border border-[#e3d8cc] bg-white/70 p-3">
+                  <div className="flex flex-wrap items-center gap-2">
+                    <input
+                      value={relationSearch}
+                      onChange={(event) => setRelationSearch(event.target.value)}
+                      placeholder="Buscar por entidades, tipo ou descrição"
+                      className="min-w-48 flex-1 rounded-lg border border-[#d5c9bd] bg-white px-3 py-2 text-sm outline-none focus:border-[#8d6d4c]"
+                      aria-label="Buscar relações"
+                    />
+                    <select
+                      value={relationTypeFilter}
+                      onChange={(event) => setRelationTypeFilter(event.target.value)}
+                      className="rounded-lg border border-[#d5c9bd] bg-white px-3 py-2 text-sm outline-none focus:border-[#8d6d4c]"
+                      aria-label="Filtrar relações por tipo"
+                    >
+                      <option value="all">Todos os tipos</option>
+                      {relationTypes.map((type) => (
+                        <option key={type} value={type}>
+                          {type}
+                        </option>
+                      ))}
+                    </select>
+                    <span className="text-xs text-[#8b887f]">
+                      {filteredRelations.length} de {relations.length}
+                    </span>
+                  </div>
+                </div>
+
                 <div className="mt-5 space-y-3">
-                  {relations.length === 0 ? (
+                  {filteredRelations.length === 0 ? (
                     <p className="rounded-2xl bg-[#f6f1ea] p-5 text-sm text-[#687065]">
-                      Nenhuma relação registrada ainda.
+                      {relations.length === 0
+                        ? "Nenhuma relação registrada ainda."
+                        : "Nenhuma relação corresponde aos filtros atuais."}
                     </p>
                   ) : (
-                    relations.map((relation) => (
+                    filteredRelations.map((relation) => (
                       <article key={relation.id} className="rounded-2xl bg-[#f6f1ea] p-4">
                         <div className="flex items-start justify-between gap-3">
                           <div>
@@ -1791,6 +2346,15 @@ export default function UniversePage() {
                             <p className="mt-2 text-xs text-[#8b887f]">
                               {renderVisibility(relation.visibility)}
                             </p>
+                            <JsonDisclosure
+                              value={{
+                                from_entity_id: relation.from_entity_id,
+                                to_entity_id: relation.to_entity_id,
+                                relation_type: relation.relation_type,
+                                description: relation.description,
+                                visibility: relation.visibility,
+                              }}
+                            />
                           </div>
                           <div className="flex shrink-0 gap-2">
                             <button
@@ -1969,13 +2533,58 @@ export default function UniversePage() {
                     </div>
                   </div>
                 )}
+                <div className="mt-5 rounded-2xl border border-[#e3d8cc] bg-white/70 p-3">
+                  <div className="flex flex-wrap items-center gap-2">
+                    <input
+                      value={eventSearch}
+                      onChange={(event) => setEventSearch(event.target.value)}
+                      placeholder="Buscar por título, descrição ou personagem"
+                      className="min-w-48 flex-1 rounded-lg border border-[#d5c9bd] bg-white px-3 py-2 text-sm outline-none focus:border-[#8d6d4c]"
+                      aria-label="Buscar eventos"
+                    />
+                    <select
+                      value={eventKindFilter}
+                      onChange={(event) =>
+                        setEventKindFilter(event.target.value as EventKind | "all")
+                      }
+                      className="rounded-lg border border-[#d5c9bd] bg-white px-3 py-2 text-sm outline-none focus:border-[#8d6d4c]"
+                      aria-label="Filtrar eventos por tipo"
+                    >
+                      <option value="all">Todos os tipos</option>
+                      {Object.entries(eventKindLabels).map(([value, label]) => (
+                        <option key={value} value={value}>
+                          {label}
+                        </option>
+                      ))}
+                    </select>
+                    <select
+                      value={eventEntityFilter}
+                      onChange={(event) => setEventEntityFilter(event.target.value)}
+                      className="max-w-full rounded-lg border border-[#d5c9bd] bg-white px-3 py-2 text-sm outline-none focus:border-[#8d6d4c]"
+                      aria-label="Filtrar eventos por personagem"
+                    >
+                      <option value="all">Todos os personagens</option>
+                      {entities.map((entity) => (
+                        <option key={entity.id} value={entity.id}>
+                          {entity.name}
+                        </option>
+                      ))}
+                    </select>
+                    <span className="text-xs text-[#8b887f]">
+                      {filteredEvents.length} de {events.length}
+                    </span>
+                  </div>
+                </div>
+
                 <div className="mt-5 space-y-3">
-                  {events.length === 0 ? (
+                  {filteredEvents.length === 0 ? (
                     <p className="rounded-2xl bg-[#f6f1ea] p-5 text-sm text-[#687065]">
-                      Nenhum evento registrado ainda.
+                      {events.length === 0
+                        ? "Nenhum evento registrado ainda."
+                        : "Nenhum evento corresponde aos filtros atuais."}
                     </p>
                   ) : (
-                    events.map((event) => (
+                    filteredEvents.map((event) => (
                       <article key={event.id} className="rounded-2xl bg-[#f6f1ea] p-4">
                         <div className="flex items-start justify-between gap-3">
                           <div>
@@ -2001,6 +2610,17 @@ export default function UniversePage() {
                                   .join(", ")}
                               </p>
                             )}
+                            <JsonDisclosure
+                              value={{
+                                event_kind: eventPayloadView(event).kind,
+                                title: eventPayloadView(event).title,
+                                description: eventPayloadView(event).description,
+                                narrative_time: eventPayloadView(event).narrativeTime,
+                                entity_ids: event.entity_ids,
+                                visibility: eventPayloadView(event).visibility,
+                                payload: event.payload || {},
+                              }}
+                            />
                           </div>
                           <div className="flex shrink-0 gap-2">
                             <button
@@ -2179,13 +2799,73 @@ export default function UniversePage() {
                     </div>
                   </div>
                 )}
+                <div className="mt-5 rounded-2xl border border-[#e3d8cc] bg-white/70 p-3">
+                  <div className="flex flex-wrap items-center gap-2">
+                    <input
+                      value={threadSearch}
+                      onChange={(event) => setThreadSearch(event.target.value)}
+                      placeholder="Buscar por título, descrição ou personagem"
+                      className="min-w-48 flex-1 rounded-lg border border-[#d5c9bd] bg-white px-3 py-2 text-sm outline-none focus:border-[#8d6d4c]"
+                      aria-label="Buscar tramas abertas"
+                    />
+                    <select
+                      value={threadStatusFilter}
+                      onChange={(event) =>
+                        setThreadStatusFilter(event.target.value as OpenThreadStatus | "all")
+                      }
+                      className="rounded-lg border border-[#d5c9bd] bg-white px-3 py-2 text-sm outline-none focus:border-[#8d6d4c]"
+                      aria-label="Filtrar tramas por status"
+                    >
+                      <option value="all">Todos os status</option>
+                      {Object.entries(threadStatusLabels).map(([value, label]) => (
+                        <option key={value} value={value}>
+                          {label}
+                        </option>
+                      ))}
+                    </select>
+                    <select
+                      value={threadPriorityFilter}
+                      onChange={(event) =>
+                        setThreadPriorityFilter(event.target.value as ThreadPriority | "all")
+                      }
+                      className="rounded-lg border border-[#d5c9bd] bg-white px-3 py-2 text-sm outline-none focus:border-[#8d6d4c]"
+                      aria-label="Filtrar tramas por prioridade"
+                    >
+                      <option value="all">Todas as prioridades</option>
+                      {Object.entries(threadPriorityLabels).map(([value, label]) => (
+                        <option key={value} value={value}>
+                          {label}
+                        </option>
+                      ))}
+                    </select>
+                    <select
+                      value={threadEntityFilter}
+                      onChange={(event) => setThreadEntityFilter(event.target.value)}
+                      className="max-w-full rounded-lg border border-[#d5c9bd] bg-white px-3 py-2 text-sm outline-none focus:border-[#8d6d4c]"
+                      aria-label="Filtrar tramas por personagem"
+                    >
+                      <option value="all">Todos os personagens</option>
+                      {entities.map((entity) => (
+                        <option key={entity.id} value={entity.id}>
+                          {entity.name}
+                        </option>
+                      ))}
+                    </select>
+                    <span className="text-xs text-[#8b887f]">
+                      {filteredThreads.length} de {openThreads.length}
+                    </span>
+                  </div>
+                </div>
+
                 <div className="mt-5 space-y-3">
-                  {openThreads.length === 0 ? (
+                  {filteredThreads.length === 0 ? (
                     <p className="rounded-2xl bg-[#f6f1ea] p-5 text-sm text-[#687065]">
-                      Nenhuma trama aberta registrada ainda.
+                      {openThreads.length === 0
+                        ? "Nenhuma trama aberta registrada ainda."
+                        : "Nenhuma trama corresponde aos filtros atuais."}
                     </p>
                   ) : (
-                    openThreads.map((thread) => (
+                    filteredThreads.map((thread) => (
                       <article key={thread.id} className="rounded-2xl bg-[#f6f1ea] p-4">
                         <div className="flex items-start justify-between gap-3">
                           <div>
@@ -2208,6 +2888,16 @@ export default function UniversePage() {
                               {thread.entity_ids.length > 0 &&
                                 ` · Relacionada a: ${thread.entity_ids.map((id) => entityById.get(id)?.name || "Entidade arquivada").join(", ")}`}
                             </p>
+                            <JsonDisclosure
+                              value={{
+                                title: thread.title,
+                                description: thread.description,
+                                status: thread.status,
+                                priority: thread.priority,
+                                entity_ids: thread.entity_ids,
+                                visibility: thread.visibility,
+                              }}
+                            />
                           </div>
                           <div className="flex shrink-0 gap-2">
                             <button
@@ -2234,6 +2924,17 @@ export default function UniversePage() {
               </div>
             )}
 
+            {activeTab === "reconciliation" && (
+              <CanonReconciliationPanel
+                bookId={bookId}
+                userId={userId}
+                context={reconciliationContext}
+                approvedSources={approvedReconciliationSources}
+                onPendingCountChange={setReconciliationPendingCount}
+                onCanonicalChange={() => load({ silent: true })}
+              />
+            )}
+
             {activeTab === "analysis" && (
               <div>
                 <div className="flex items-start justify-between gap-3">
@@ -2241,7 +2942,7 @@ export default function UniversePage() {
                     <p className="text-xs font-semibold uppercase tracking-[0.18em] text-[#8d6d4c]">
                       Memória sob revisão humana
                     </p>
-                    <h2 className="mt-1 text-2xl font-semibold">Propostas da IA</h2>
+                    <h2 className="mt-1 text-2xl font-semibold">Propostas pendentes</h2>
                     <p className="mt-2 max-w-2xl text-sm leading-6 text-[#687065]">
                       A análise lê uma versão aprovada e sugere entidades, fatos, relações, eventos
                       e tramas abertas. Nada nesta aba vira cânone automaticamente.
@@ -2326,165 +3027,251 @@ export default function UniversePage() {
                   </details>
                 )}
 
-                <div className="mt-5 space-y-3">
-                  {proposals.length === 0 ? (
-                    <p className="rounded-2xl bg-[#f6f1ea] p-5 text-sm leading-6 text-[#687065]">
-                      Nenhuma proposta foi registrada para esta seleção. Volte ao capítulo, aprove
-                      uma versão do Manuscrito e use “Analisar Memória”.
+                <div className="mt-5 rounded-2xl border border-[#e3d8cc] bg-white/70 p-3">
+                  <div className="flex flex-wrap items-center gap-2">
+                    <input
+                      value={proposalSearch}
+                      onChange={(event) => {
+                        setProposalSearch(event.target.value)
+                        setProposalIndex(0)
+                      }}
+                      placeholder="Buscar por título, evidência ou explicação"
+                      className="min-w-48 flex-1 rounded-lg border border-[#d5c9bd] bg-white px-3 py-2 text-sm outline-none focus:border-[#8d6d4c]"
+                      aria-label="Buscar propostas pendentes"
+                    />
+                    <select
+                      value={proposalKindFilter}
+                      onChange={(event) => {
+                        setProposalKindFilter(
+                          event.target.value as MemoryProposal["proposal_kind"] | "all",
+                        )
+                        setProposalIndex(0)
+                      }}
+                      className="rounded-lg border border-[#d5c9bd] bg-white px-3 py-2 text-sm outline-none focus:border-[#8d6d4c]"
+                      aria-label="Filtrar propostas por tipo"
+                    >
+                      <option value="all">Todos os tipos</option>
+                      <option value="entity">Entidades</option>
+                      <option value="fact">Fatos</option>
+                      <option value="relation">Relações</option>
+                      <option value="event">Eventos</option>
+                      <option value="open_thread">Tramas abertas</option>
+                    </select>
+                    <span className="text-xs text-[#8b887f]">
+                      {filteredProposals.length} de {pendingProposalCount} pendentes
+                    </span>
+                  </div>
+                </div>
+
+                <div className="mt-5">
+                  {filteredProposals.length === 0 ? (
+                    <p className="rounded-2xl bg-[#f1f6ee] p-5 text-sm leading-6 text-[#52614e]">
+                      {pendingProposalCount === 0
+                        ? "Não há propostas pendentes. Propostas aprovadas, ignoradas e substituídas ficam fora desta aba."
+                        : "Nenhuma proposta pendente corresponde aos filtros atuais."}
                     </p>
                   ) : (
-                    proposals.map((proposal) => (
-                      <article
-                        key={proposal.id}
-                        className="rounded-2xl border border-[#e3d8cc] bg-[#f6f1ea] p-4"
-                      >
-                        <div className="flex flex-wrap items-start justify-between gap-2">
-                          <div>
-                            <p className="text-xs font-semibold uppercase tracking-[0.16em] text-[#8d6d4c]">
-                              {proposal.proposal_kind === "entity"
-                                ? "Entidade"
-                                : proposal.proposal_kind === "fact"
-                                  ? "Fato"
-                                  : proposal.proposal_kind === "relation"
-                                    ? "Relação"
-                                    : proposal.proposal_kind === "event"
-                                      ? "Evento"
-                                      : "Trama aberta"}
-                            </p>
-                            <h3 className="mt-1 text-lg font-semibold">{proposal.title}</h3>
+                    (() => {
+                      const proposal =
+                        filteredProposals[Math.min(proposalIndex, filteredProposals.length - 1)]
+                      return (
+                        <div className="space-y-3">
+                          <div className="flex items-center justify-between gap-2 text-xs text-[#65735f]">
+                            <span>
+                              {proposalIndex + 1} de {filteredProposals.length} pendente(s)
+                            </span>
+                            <span>As decisões continuam manuais.</span>
                           </div>
-                          <span
-                            className={
-                              "rounded-full px-2 py-1 text-xs font-semibold " +
-                              (proposal.status === "pending"
-                                ? "bg-[#fff8e9] text-[#8d6d4c]"
-                                : proposal.status === "approved"
-                                  ? "bg-[#e4f2dc] text-[#36552d]"
-                                  : "bg-[#fbe8e3] text-[#8d493b]")
-                            }
+                          <div className="flex items-stretch gap-2">
+                            <button
+                              type="button"
+                              onClick={() =>
+                                setProposalIndex((current) =>
+                                  current > 0 ? current - 1 : filteredProposals.length - 1,
+                                )
+                              }
+                              disabled={filteredProposals.length < 2}
+                              className="w-8 shrink-0 rounded-xl border border-[#d9cfc3] bg-white text-lg text-[#65735f] transition hover:border-[#65735f] disabled:cursor-not-allowed disabled:opacity-40"
+                              aria-label="Proposta pendente anterior"
+                            >
+                              ←
+                            </button>
+                            <article
+                              key={proposal.id}
+                              className="min-w-0 flex-1 rounded-2xl border border-[#e3d8cc] bg-[#f6f1ea] p-4"
+                              aria-live="polite"
+                            >
+                              <div className="flex flex-wrap items-start justify-between gap-2">
+                                <div>
+                                  <p className="text-xs font-semibold uppercase tracking-[0.16em] text-[#8d6d4c]">
+                                    {proposal.proposal_kind === "entity"
+                                      ? "Entidade"
+                                      : proposal.proposal_kind === "fact"
+                                        ? "Fato"
+                                        : proposal.proposal_kind === "relation"
+                                          ? "Relação"
+                                          : proposal.proposal_kind === "event"
+                                            ? "Evento"
+                                            : "Trama aberta"}
+                                  </p>
+                                  <h3 className="mt-1 text-lg font-semibold">{proposal.title}</h3>
+                                </div>
+                                <span className="rounded-full bg-[#fff8e9] px-2 py-1 text-xs font-semibold text-[#8d6d4c]">
+                                  Pendente
+                                </span>
+                              </div>
+                              <p className="mt-3 text-sm leading-6 text-[#52614e]">
+                                {proposal.explanation}
+                              </p>
+                              <blockquote className="mt-3 border-l-2 border-[#c7ad8e] pl-3 text-sm italic leading-6 text-[#687065]">
+                                “{proposal.evidence}”
+                              </blockquote>
+                              <div className="mt-3 flex flex-wrap gap-x-4 gap-y-1 text-xs text-[#8b887f]">
+                                <span>Bloco {proposal.source_block ?? "?"}</span>
+                                <span>
+                                  Confiança:{" "}
+                                  {proposal.confidence == null
+                                    ? "—"
+                                    : `${Math.round(proposal.confidence * 100)}%`}
+                                </span>
+                              </div>
+                              <details className="mt-3 rounded-xl bg-white/70 p-3">
+                                <summary className="cursor-pointer text-xs font-semibold text-[#65735f]">
+                                  Ver dados estruturados e âncora
+                                </summary>
+                                <p className="mt-2 whitespace-pre-wrap text-xs leading-5 text-[#687065]">
+                                  {proposal.source_anchor}
+                                </p>
+                                <pre className="mt-2 max-h-72 overflow-auto whitespace-pre-wrap break-words text-xs leading-5 text-[#52614e]">
+                                  {JSON.stringify(proposal.payload, null, 2)}
+                                </pre>
+                              </details>
+                              {editingProposalId === proposal.id ? (
+                                <div className="mt-4 rounded-xl border border-[#d7c7ae] bg-white/70 p-3">
+                                  <label className="block text-xs font-semibold text-[#65735f]">
+                                    Título da sugestão
+                                    <input
+                                      value={proposalEditTitle}
+                                      onChange={(event) => setProposalEditTitle(event.target.value)}
+                                      maxLength={240}
+                                      className="mt-2 w-full rounded-lg border border-[#d5c9bd] bg-white px-3 py-2 text-sm font-normal outline-none focus:border-[#8d6d4c]"
+                                      aria-label={`Título editado da proposta ${proposal.title}`}
+                                    />
+                                  </label>
+                                  <label className="mt-3 block text-xs font-semibold text-[#65735f]">
+                                    Editar dados antes de adicionar ao Universo
+                                    <textarea
+                                      value={proposalEditPayload}
+                                      onChange={(event) =>
+                                        setProposalEditPayload(event.target.value)
+                                      }
+                                      rows={8}
+                                      spellCheck={false}
+                                      className="mt-2 w-full resize-y rounded-lg border border-[#d5c9bd] bg-white px-3 py-2 font-mono text-xs leading-5 outline-none focus:border-[#8d6d4c]"
+                                      aria-label={`Payload editado da proposta ${proposal.title}`}
+                                    />
+                                  </label>
+                                  <div className="mt-3 flex flex-wrap justify-end gap-2">
+                                    <button
+                                      type="button"
+                                      onClick={cancelProposalEdit}
+                                      disabled={translatingProposals || proposalActionId !== null}
+                                      className="rounded-lg border border-[#d5c9bd] px-3 py-2 text-xs font-semibold text-[#687065] disabled:opacity-50"
+                                    >
+                                      Cancelar
+                                    </button>
+                                    <button
+                                      type="button"
+                                      onClick={() => void saveProposalEdit(proposal)}
+                                      disabled={translatingProposals || proposalActionId !== null}
+                                      className="rounded-lg border border-[#65735f] px-3 py-2 text-xs font-semibold text-[#65735f] disabled:opacity-50"
+                                    >
+                                      {proposalActionId === proposal.id
+                                        ? "Salvando…"
+                                        : "Salvar sugestão"}
+                                    </button>
+                                    <button
+                                      type="button"
+                                      onClick={() => void approveProposal(proposal)}
+                                      disabled={translatingProposals || proposalActionId !== null}
+                                      className="rounded-lg bg-[#65735f] px-3 py-2 text-xs font-semibold text-white disabled:opacity-50"
+                                    >
+                                      {proposalActionId === proposal.id
+                                        ? "Adicionando…"
+                                        : "Adicionar com edição"}
+                                    </button>
+                                  </div>
+                                </div>
+                              ) : (
+                                <div className="mt-4 flex flex-wrap items-center gap-3 border-t border-[#e3d8cc] pt-3">
+                                  <button
+                                    type="button"
+                                    onClick={() => void approveProposal(proposal)}
+                                    disabled={translatingProposals || proposalActionId !== null}
+                                    className="rounded-lg bg-[#65735f] px-3 py-2 text-xs font-semibold text-white disabled:opacity-50"
+                                  >
+                                    {proposalActionId === proposal.id
+                                      ? "Adicionando…"
+                                      : "Adicionar ao Universo"}
+                                  </button>
+                                  <button
+                                    type="button"
+                                    onClick={() => startProposalEdit(proposal)}
+                                    disabled={translatingProposals || proposalActionId !== null}
+                                    className="text-xs font-semibold text-[#65735f] underline underline-offset-2 disabled:opacity-50"
+                                  >
+                                    Editar
+                                  </button>
+                                  <button
+                                    type="button"
+                                    onClick={() => void rejectProposal(proposal)}
+                                    disabled={translatingProposals || proposalActionId !== null}
+                                    className="text-xs font-semibold text-[#8d493b] underline underline-offset-2 disabled:opacity-50"
+                                  >
+                                    Ignorar
+                                  </button>
+                                  <span className="text-xs text-[#8b887f]">
+                                    Pendente não é cânone.
+                                  </span>
+                                </div>
+                              )}
+                            </article>
+                            <button
+                              type="button"
+                              onClick={() =>
+                                setProposalIndex((current) =>
+                                  current < filteredProposals.length - 1 ? current + 1 : 0,
+                                )
+                              }
+                              disabled={filteredProposals.length < 2}
+                              className="w-8 shrink-0 rounded-xl border border-[#d9cfc3] bg-white text-lg text-[#65735f] transition hover:border-[#65735f] disabled:cursor-not-allowed disabled:opacity-40"
+                              aria-label="Próxima proposta pendente"
+                            >
+                              →
+                            </button>
+                          </div>
+                          <div
+                            className="flex justify-center gap-1.5"
+                            aria-label="Navegação das propostas pendentes"
                           >
-                            {proposal.status === "pending"
-                              ? "Pendente"
-                              : proposal.status === "approved"
-                                ? "Aprovada"
-                                : proposal.status === "rejected"
-                                  ? "Ignorada"
-                                  : "Substituída"}
-                          </span>
-                        </div>
-                        <p className="mt-3 text-sm leading-6 text-[#52614e]">
-                          {proposal.explanation}
-                        </p>
-                        <blockquote className="mt-3 border-l-2 border-[#c7ad8e] pl-3 text-sm italic leading-6 text-[#687065]">
-                          “{proposal.evidence}”
-                        </blockquote>
-                        <div className="mt-3 flex flex-wrap gap-x-4 gap-y-1 text-xs text-[#8b887f]">
-                          <span>Bloco {proposal.source_block ?? "?"}</span>
-                          <span>
-                            Confiança:{" "}
-                            {proposal.confidence == null
-                              ? "—"
-                              : `${Math.round(proposal.confidence * 100)}%`}
-                          </span>
-                        </div>
-                        <details className="mt-3 rounded-xl bg-white/70 p-3">
-                          <summary className="cursor-pointer text-xs font-semibold text-[#65735f]">
-                            Ver dados estruturados e âncora
-                          </summary>
-                          <p className="mt-2 whitespace-pre-wrap text-xs leading-5 text-[#687065]">
-                            {proposal.source_anchor}
-                          </p>
-                          <pre className="mt-2 overflow-x-auto whitespace-pre-wrap text-xs leading-5 text-[#52614e]">
-                            {JSON.stringify(proposal.payload, null, 2)}
-                          </pre>
-                        </details>
-                        {proposal.status === "pending" && editingProposalId === proposal.id ? (
-                          <div className="mt-4 rounded-xl border border-[#d7c7ae] bg-white/70 p-3">
-                            <label className="block text-xs font-semibold text-[#65735f]">
-                              Editar dados antes de adicionar ao Universo
-                              <textarea
-                                value={proposalEditPayload}
-                                onChange={(event) => setProposalEditPayload(event.target.value)}
-                                rows={8}
-                                spellCheck={false}
-                                className="mt-2 w-full resize-y rounded-lg border border-[#d5c9bd] bg-white px-3 py-2 font-mono text-xs leading-5 outline-none focus:border-[#8d6d4c]"
-                                aria-label={`Payload editado da proposta ${proposal.title}`}
+                            {filteredProposals.map((item, index) => (
+                              <button
+                                key={`proposal-dot-${item.id}`}
+                                type="button"
+                                onClick={() => setProposalIndex(index)}
+                                className={`h-2 w-2 rounded-full transition ${
+                                  index === proposalIndex
+                                    ? "bg-[#65735f]"
+                                    : "bg-[#d9cfc3] hover:bg-[#a9b1a1]"
+                                }`}
+                                aria-label={`Ir para a proposta ${index + 1}`}
+                                aria-current={index === proposalIndex ? "true" : undefined}
                               />
-                            </label>
-                            <div className="mt-3 flex flex-wrap justify-end gap-2">
-                              <button
-                                type="button"
-                                onClick={cancelProposalEdit}
-                                disabled={translatingProposals || proposalActionId !== null}
-                                className="rounded-lg border border-[#d5c9bd] px-3 py-2 text-xs font-semibold text-[#687065] disabled:opacity-50"
-                              >
-                                Cancelar
-                              </button>
-                              <button
-                                type="button"
-                                onClick={() => void approveProposal(proposal)}
-                                disabled={translatingProposals || proposalActionId !== null}
-                                className="rounded-lg bg-[#65735f] px-3 py-2 text-xs font-semibold text-white disabled:opacity-50"
-                              >
-                                {proposalActionId === proposal.id
-                                  ? "Adicionando…"
-                                  : "Adicionar com edição"}
-                              </button>
-                            </div>
+                            ))}
                           </div>
-                        ) : proposal.status === "pending" ? (
-                          <div className="mt-4 flex flex-wrap items-center gap-3 border-t border-[#e3d8cc] pt-3">
-                            <button
-                              type="button"
-                              onClick={() => void approveProposal(proposal)}
-                              disabled={translatingProposals || proposalActionId !== null}
-                              className="rounded-lg bg-[#65735f] px-3 py-2 text-xs font-semibold text-white disabled:opacity-50"
-                            >
-                              {proposalActionId === proposal.id
-                                ? "Adicionando…"
-                                : "Adicionar ao Universo"}
-                            </button>
-                            <button
-                              type="button"
-                              onClick={() => startProposalEdit(proposal)}
-                              disabled={translatingProposals || proposalActionId !== null}
-                              className="text-xs font-semibold text-[#65735f] underline underline-offset-2 disabled:opacity-50"
-                            >
-                              Editar
-                            </button>
-                            <button
-                              type="button"
-                              onClick={() => void rejectProposal(proposal)}
-                              disabled={translatingProposals || proposalActionId !== null}
-                              className="text-xs font-semibold text-[#8d493b] underline underline-offset-2 disabled:opacity-50"
-                            >
-                              Ignorar
-                            </button>
-                            <span className="text-xs text-[#8b887f]">Pendente não é cânone.</span>
-                          </div>
-                        ) : proposal.status === "approved" && proposal.proposal_kind === "event" ? (
-                          <div className="mt-3 border-t border-[#e3d8cc] pt-3">
-                            <button
-                              type="button"
-                              onClick={() => void reopenEventProposal(proposal)}
-                              disabled={translatingProposals || proposalActionId !== null}
-                              className="text-xs font-semibold text-[#8d6d4c] underline underline-offset-2 disabled:opacity-50"
-                            >
-                              {proposalActionId === proposal.id
-                                ? "Reabrindo…"
-                                : "Reabrir evento para corrigir e aprovar novamente"}
-                            </button>
-                            <p className="mt-1 text-xs text-[#8b887f]">
-                              Reutiliza o mesmo registro canônico e não cria duplicata.
-                            </p>
-                          </div>
-                        ) : proposal.review_note ? (
-                          <p className="mt-3 text-xs text-[#8b887f]">
-                            Nota: {proposal.review_note}
-                          </p>
-                        ) : null}
-                      </article>
-                    ))
+                        </div>
+                      )
+                    })()
                   )}
                 </div>
               </div>
