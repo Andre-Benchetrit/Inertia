@@ -50,6 +50,12 @@ const context: CanonicalMemoryContext = {
       statement: "Cod odiava X.",
       status: "active",
     },
+    {
+      id: "fact-jhin",
+      entity_id: "cod",
+      statement: "Cod encontrou Jhin na estrada.",
+      status: "active",
+    },
   ],
   relations: [],
   events: [],
@@ -114,6 +120,23 @@ assert(
       String(proposal.payload.name).toLocaleLowerCase().includes("gelo"),
   ),
   "Não gerou entidade provisória para o poder de gelo.",
+)
+assert(
+  proposals.some(
+    (proposal) =>
+      proposal.proposal_kind === "entity" &&
+      proposal.payload.entity_type === "character" &&
+      proposal.payload.name === "Jhin",
+  ),
+  "Não gerou entidade provisória para a personagem Jhin.",
+)
+assert(
+  !proposals.some(
+    (proposal) =>
+      proposal.proposal_kind === "entity" &&
+      ["Irmão", "Quem", "Responsável"].includes(String(proposal.payload.name)),
+  ),
+  "Criou entidade provisória a partir de palavra genérica de thread.",
 )
 assert(
   proposals.some(

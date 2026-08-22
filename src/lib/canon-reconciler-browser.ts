@@ -849,6 +849,127 @@ function explicitRelatedEntities(
   return explicit.length ? explicit : entityNamesInText(fact.statement, entities, subjectId)
 }
 
+const GENERIC_MENTION_WORDS = new Set([
+  "A",
+  "O",
+  "As",
+  "Os",
+  "Um",
+  "Uma",
+  "Ele",
+  "Ela",
+  "Eles",
+  "Elas",
+  "Isso",
+  "Esse",
+  "Essa",
+  "Festival",
+  "Cidade",
+  "Torre",
+  "Casa",
+  "Reino",
+  "Mundo",
+  "Espada",
+  "Poder",
+  "Poderes",
+  "História",
+  "Historia",
+  "Irmão",
+  "Irmao",
+  "Irmãos",
+  "Irmaos",
+  "Quem",
+  "Responsável",
+  "Responsavel",
+  "Identidade",
+  "Morte",
+])
+
+const CHARACTER_MENTION_HINTS = /\b(?:é|era|foi|visto|vista|homem|mulher|jovem|doutor|doutora|senhor|senhora|personagem|curou|matou|atacou|lutou|encontrou|conheceu|falou|disse|chegou|partiu|aparece|apareceu|surge|surgiu|vive|mora|viaja|confronta|mencionado|mencionada|menção|menção|irmão|irmao|amigo|amiga)\b/i
+
+function cleanMentionedCharacterName(value: string) {
+  return value
+    .replace(/^(?:o|a|os|as|um|uma|doutor|doutora|dr\.?|senhor|senhora)\s+/i, "")
+    .replace(/\s+/g, " ")
+    .trim()
+}
+
+function mentionedCharacterNames(
+  text: string,
+  context: CanonicalMemoryContext,
+  excludedNames: string[] = [],
+) {
+  const compactText = text.trim().replace(/[.!?]+$/g, "").trim()
+  const standaloneName = /^[A-ZÁÉÍÓÚÂÊÔÃÕÇ][A-Za-zÁÉÍÓÚÂÊÔÃÕÇáéíóúâêôãõç'-]*(?:\s+[A-ZÁÉÍÓÚÂÊÔÃÕÇ][A-Za-zÁÉÍÓÚÂÊÔÃÕÇáéíóúâêôãõç'-]*)?$/.test(compactText)
+  if (!CHARACTER_MENTION_HINTS.test(text) && !standaloneName) return []
+  const knownNames = new Set(
+    context.entities.flatMap((entity) => [entity.name, ...(entity.aliases ?? [])]).map(normalizePart),
+  )
+  const excluded = new Set(excludedNames.map(normalizePart))
+  const candidates = text.match(/\b[A-ZÁÉÍÓÚÂÊÔÃÕÇ][A-Za-zÁÉÍÓÚÂÊÔÃÕÇáéíóúâêôãõç'-]*(?:\s+[A-ZÁÉÍÓÚÂÊÔÃÕÇ][A-Za-zÁÉÍÓÚÂÊÔÃÕÇáéíóúâêôãõç'-]*)?\b/g) ?? []
+  return candidates
+    .map(cleanMentionedCharacterName)
+    .filter((candidate) => candidate.length >= 2 && candidate.length <= 80)
+    .filter((candidate) => !GENERIC_MENTION_WORDS.has(candidate))
+    .filter((candidate) => !knownNames.has(normalizePart(candidate)))
+    .filter((candidate) => !excluded.has(normalizePart(candidate)))
+    .filter((candidate) => !/\b(?:de|do|da|dos|das)\b/i.test(candidate))
+    .filter(
+      (candidate, index, items) =>
+        items.findIndex((item) => normalizePart(item) === normalizePart(candidate)) === index,
+    )
+}
+
+function pushMentionedCharacterEntities(
+  context: CanonicalMemoryContext,
+  proposals: CanonReconciliationProposal[],
+) {
+  const records: Array<{
+    recordType: "fact" | "event" | "open_thread"
+    recordId: string
+    text: string
+    excludedNames?: string[]
+  }> = []
+
+  for (const fact of context.facts as Array<CanonicalMemoryFact & { id?: string }>) {
+    if (!fact.id) continue
+    const excludedName = extractObjectName(fact.statement, "owns")
+    records.push({
+      recordType: "fact",
+      recordId: fact.id,
+      text: fact.statement,
+      excludedNames: excludedName ? [excludedName] : [],
+    })
+  }
+  for (const event of context.events ?? []) {
+    records.push({
+      recordType: "event",
+      recordId: event.id,
+      text: `${event.title}. ${event.description}`,
+    })
+  }
+  for (const thread of context.openThreads ?? []) {
+    records.push({
+      recordType: "open_thread",
+      recordId: thread.id,
+      text: `${thread.title}. ${thread.question ?? ""}. ${thread.description}`,
+    })
+  }
+
+  for (const record of records) {
+    for (const name of mentionedCharacterNames(record.text, context, record.excludedNames)) {
+      pushProvisionalEntity(
+        name,
+        "character",
+        [{ record_type: record.recordType, record_id: record.recordId, role: "primary" }],
+        proposals,
+        `A menção a “${name}” parece identificar uma personagem ainda não cadastrada no Universo.`,
+        record.text,
+      )
+    }
+  }
+}
+
 function extractObjectName(statement: string, relationType: string) {
   const normalized = statement.trim()
   const patterns =
@@ -1179,6 +1300,7 @@ export function runCanonReconciliationRules(
   )
 
   attributeRelationCandidates(context.entities, proposals)
+  pushMentionedCharacterEntities(context, proposals)
   for (const fact of context.facts as Array<CanonicalMemoryFact & { id: string }>) {
     if (fact.status && fact.status !== "active") continue
     pushFactRelationProposal(fact, context, proposals)

@@ -53,3 +53,13 @@ A seleção do modelo continua dependente de `localStorage` na chave `inertia:ol
 A fila de fontes pendentes já é criada no banco, mas a interface ainda usa as proposals aprovadas carregadas na página para montar as fontes incrementais. Uma evolução posterior pode substituir essa derivação por uma consulta direta à fila, incluindo botão específico para consolidar somente fontes não consumidas.
 
 As alterações locais que já existiam antes deste sprint foram preservadas e não foram revertidas.
+
+
+## Correções posteriores ao primeiro pull
+
+Após o primeiro uso, foram corrigidos dois problemas identificados em produção:
+
+1. A aplicação de merges de entidades usava `ON CONFLICT (event_id, entity_id)` e `ON CONFLICT (thread_id, entity_id)`, mas alguns bancos existentes não possuíam as constraints compostas dessas tabelas de associação. A migration `0028_fix_reconciliation_conflict_constraints.sql` remove duplicatas antigas de associações e cria os índices únicos necessários.
+2. O Rule Engine passou a reconhecer nomes próprios mencionados em fatos, eventos e tramas e gerar entidades provisórias do tipo `character`. O caso `Cod encontrou Jhin na estrada` agora gera uma proposta `entity/create` para `Jhin`, sem transformar palavras genéricas de perguntas como “Quem”, “Irmão” ou “Responsável” em personagens.
+
+Depois dessas correções, o teste de fumaça passou com oito propostas semânticas, incluindo `Jhin`, e o build completo da aplicação passou com sucesso.
