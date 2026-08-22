@@ -209,7 +209,8 @@ function inferFactType(statement: string): NonNullable<CanonicalMemoryFact["fact
   const normalized = normalizePart(statement)
   if (/\b(?:recebeu|ganhou|possui|tem|usa|usou|perdeu)\b/.test(normalized)) return "possession"
   if (/\b(?:poder|poderes|habilidade|domina)\b/.test(normalized)) return "ability"
-  if (/\b(?:irmao|irma|pai|mae|filho|amigo|inimigo|membro|pertence|integra)\b/.test(normalized)) return "other"
+  if (/\b(?:irmao|irma|pai|mae|filho|amigo|inimigo|membro|pertence|integra)\b/.test(normalized))
+    return "other"
   if (/\b(?:olhos|cabelos|cicatriz|aparencia|aparência)\b/.test(normalized)) return "appearance"
   if (/\b(?:nasceu|origem|vem de)\b/.test(normalized)) return "origin"
   return "other"
@@ -233,7 +234,7 @@ export function adaptCanonContextToV5(context: CanonicalMemoryContext): Canonica
       ...fact,
       fact_type: fact.fact_type ?? inferFactType(fact.statement),
       subject_entity:
-        fact.subject_entity ?? (fact.entity_id ? entityNames.get(fact.entity_id) ?? null : null),
+        fact.subject_entity ?? (fact.entity_id ? (entityNames.get(fact.entity_id) ?? null) : null),
       related_entities:
         fact.related_entities ??
         context.entities
@@ -346,12 +347,21 @@ function normalizeTarget(value: unknown, allowedIds?: Set<string>) {
 
 function normalizePayload(value: unknown, allowedIds?: Set<string>) {
   const payload = { ...asRecord(value) }
-  for (const key of ["record_id", "id", "survivor_id", "entity_id", "from_entity_id", "to_entity_id"]) {
+  for (const key of [
+    "record_id",
+    "id",
+    "survivor_id",
+    "entity_id",
+    "from_entity_id",
+    "to_entity_id",
+  ]) {
     if (key in payload && !hasAllowedCanonicalId(payload[key], allowedIds)) delete payload[key]
   }
   for (const key of ["source_record_ids", "entity_ids"]) {
     if (Array.isArray(payload[key])) {
-      payload[key] = payload[key].filter((candidate) => hasAllowedCanonicalId(candidate, allowedIds))
+      payload[key] = payload[key].filter((candidate) =>
+        hasAllowedCanonicalId(candidate, allowedIds),
+      )
     }
   }
   return payload
@@ -521,7 +531,10 @@ function makeRuleProposal(input: {
     operation: input.operation,
     title: trimText(input.title, 240),
     target,
-    payload: input.payload,
+    payload: {
+      ...input.payload,
+      analysis_origin: "rule_engine",
+    },
     basis: input.basis,
     evidence_kind: "canon_record",
     evidence: trimText(input.evidence ?? input.explanation, 260),
@@ -815,17 +828,25 @@ const FACT_RELATION_KEYWORDS: Array<{ keywords: string[]; relationType: string }
   { keywords: ["amigo", "amiga", "amizade"], relationType: "friend_of" },
   { keywords: ["inimigo", "inimiga", "inimizade"], relationType: "enemy_of" },
   { keywords: ["membro", "pertence", "integra", "faz parte"], relationType: "member_of" },
-  { keywords: ["criado por", "criada por", "forjado por", "forjada por"], relationType: "created_by" },
+  {
+    keywords: ["criado por", "criada por", "forjado por", "forjada por"],
+    relationType: "created_by",
+  },
   { keywords: ["localizado em", "fica em", "está em", "esta em"], relationType: "located_in" },
 ]
 
 function entityForFact(fact: CanonicalMemoryFact, entities: CanonicalMemoryEntity[]) {
   if (fact.entity_id) return entities.find((entity) => entity.id === fact.entity_id) ?? null
-  if (fact.subject_entity) return resolveUniqueEntity(fact.subject_entity, entityNameIndex(entities))
+  if (fact.subject_entity)
+    return resolveUniqueEntity(fact.subject_entity, entityNameIndex(entities))
   return null
 }
 
-function entityNamesInText(statement: string, entities: CanonicalMemoryEntity[], excludedId?: string) {
+function entityNamesInText(
+  statement: string,
+  entities: CanonicalMemoryEntity[],
+  excludedId?: string,
+) {
   const normalizedStatement = normalizePart(statement)
   return entities
     .filter((entity) => entity.id !== excludedId)
@@ -849,122 +870,45 @@ function explicitRelatedEntities(
   return explicit.length ? explicit : entityNamesInText(fact.statement, entities, subjectId)
 }
 
-const GENERIC_MENTION_WORDS = new Set([
-  "A",
-  "O",
-  "As",
-  "Os",
-  "Um",
-  "Uma",
-  "Ele",
-  "Ela",
-  "Eles",
-  "Elas",
-  "Isso",
-  "Esse",
-  "Essa",
-  "Festival",
-  "Cidade",
-  "Torre",
-  "Casa",
-  "Reino",
-  "Mundo",
-  "Espada",
-  "Poder",
-  "Poderes",
-  "História",
-  "Historia",
-  "Irmão",
-  "Irmao",
-  "Irmãos",
-  "Irmaos",
-  "Quem",
-  "Responsável",
-  "Responsavel",
-  "Identidade",
-  "Morte",
-])
-
-const CHARACTER_MENTION_HINTS = /\b(?:é|era|foi|visto|vista|homem|mulher|jovem|doutor|doutora|senhor|senhora|personagem|curou|matou|atacou|lutou|encontrou|conheceu|falou|disse|chegou|partiu|aparece|apareceu|surge|surgiu|vive|mora|viaja|confronta|mencionado|mencionada|menção|menção|irmão|irmao|amigo|amiga)\b/i
-
-function cleanMentionedCharacterName(value: string) {
-  return value
-    .replace(/^(?:o|a|os|as|um|uma|doutor|doutora|dr\.?|senhor|senhora)\s+/i, "")
-    .replace(/\s+/g, " ")
-    .trim()
-}
-
-function mentionedCharacterNames(
-  text: string,
-  context: CanonicalMemoryContext,
-  excludedNames: string[] = [],
-) {
-  const compactText = text.trim().replace(/[.!?]+$/g, "").trim()
-  const standaloneName = /^[A-ZÁÉÍÓÚÂÊÔÃÕÇ][A-Za-zÁÉÍÓÚÂÊÔÃÕÇáéíóúâêôãõç'-]*(?:\s+[A-ZÁÉÍÓÚÂÊÔÃÕÇ][A-Za-zÁÉÍÓÚÂÊÔÃÕÇáéíóúâêôãõç'-]*)?$/.test(compactText)
-  if (!CHARACTER_MENTION_HINTS.test(text) && !standaloneName) return []
-  const knownNames = new Set(
-    context.entities.flatMap((entity) => [entity.name, ...(entity.aliases ?? [])]).map(normalizePart),
-  )
-  const excluded = new Set(excludedNames.map(normalizePart))
-  const candidates = text.match(/\b[A-ZÁÉÍÓÚÂÊÔÃÕÇ][A-Za-zÁÉÍÓÚÂÊÔÃÕÇáéíóúâêôãõç'-]*(?:\s+[A-ZÁÉÍÓÚÂÊÔÃÕÇ][A-Za-zÁÉÍÓÚÂÊÔÃÕÇáéíóúâêôãõç'-]*)?\b/g) ?? []
-  return candidates
-    .map(cleanMentionedCharacterName)
-    .filter((candidate) => candidate.length >= 2 && candidate.length <= 80)
-    .filter((candidate) => !GENERIC_MENTION_WORDS.has(candidate))
-    .filter((candidate) => !knownNames.has(normalizePart(candidate)))
-    .filter((candidate) => !excluded.has(normalizePart(candidate)))
-    .filter((candidate) => !/\b(?:de|do|da|dos|das)\b/i.test(candidate))
+function structuredCharacterNames(fact: CanonicalMemoryFact & { mentioned_entities?: unknown }) {
+  const values = Array.isArray(fact.mentioned_entities) ? fact.mentioned_entities : []
+  return values
+    .map((value) => {
+      if (typeof value === "string") return value.trim()
+      if (isRecord(value) && value.entity_type === "character") {
+        return typeof value.name === "string" ? value.name.trim() : ""
+      }
+      return ""
+    })
+    .filter((value) => value.length >= 2 && value.length <= 120)
     .filter(
-      (candidate, index, items) =>
-        items.findIndex((item) => normalizePart(item) === normalizePart(candidate)) === index,
+      (value, index, items) =>
+        items.findIndex((item) => normalizePart(item) === normalizePart(value)) === index,
     )
 }
 
-function pushMentionedCharacterEntities(
+function pushStructuredCharacterEntities(
   context: CanonicalMemoryContext,
   proposals: CanonReconciliationProposal[],
 ) {
-  const records: Array<{
-    recordType: "fact" | "event" | "open_thread"
-    recordId: string
-    text: string
-    excludedNames?: string[]
-  }> = []
-
-  for (const fact of context.facts as Array<CanonicalMemoryFact & { id?: string }>) {
+  for (const fact of context.facts as Array<
+    CanonicalMemoryFact & { id?: string; mentioned_entities?: unknown }
+  >) {
     if (!fact.id) continue
-    const excludedName = extractObjectName(fact.statement, "owns")
-    records.push({
-      recordType: "fact",
-      recordId: fact.id,
-      text: fact.statement,
-      excludedNames: excludedName ? [excludedName] : [],
-    })
-  }
-  for (const event of context.events ?? []) {
-    records.push({
-      recordType: "event",
-      recordId: event.id,
-      text: `${event.title}. ${event.description}`,
-    })
-  }
-  for (const thread of context.openThreads ?? []) {
-    records.push({
-      recordType: "open_thread",
-      recordId: thread.id,
-      text: `${thread.title}. ${thread.question ?? ""}. ${thread.description}`,
-    })
-  }
-
-  for (const record of records) {
-    for (const name of mentionedCharacterNames(record.text, context, record.excludedNames)) {
+    for (const name of structuredCharacterNames(fact)) {
+      const exists = context.entities.some((entity) =>
+        [entity.name, ...(entity.aliases ?? [])].some(
+          (value) => normalizePart(value) === normalizePart(name),
+        ),
+      )
+      if (exists) continue
       pushProvisionalEntity(
         name,
         "character",
-        [{ record_type: record.recordType, record_id: record.recordId, role: "primary" }],
+        [{ record_type: "fact", record_id: fact.id, role: "primary" }],
         proposals,
-        `A menção a “${name}” parece identificar uma personagem ainda não cadastrada no Universo.`,
-        record.text,
+        `O registro estruturado identifica “${name}” como personagem, mas ela ainda não está cadastrada no Universo.`,
+        fact.statement,
       )
     }
   }
@@ -994,9 +938,13 @@ function extractObjectName(statement: string, relationType: string) {
 
 function hasTemporaryPossessionLanguage(statement: string) {
   const normalized = normalizePart(statement)
-  return ["por alguns segundos", "para olhar", "por um instante", "temporariamente", "pegou emprestado"].some(
-    (marker) => normalized.includes(normalizePart(marker)),
-  )
+  return [
+    "por alguns segundos",
+    "para olhar",
+    "por um instante",
+    "temporariamente",
+    "pegou emprestado",
+  ].some((marker) => normalized.includes(normalizePart(marker)))
 }
 
 function relationAlreadyExists(
@@ -1083,7 +1031,9 @@ function pushFactRelationProposal(
     /\b(?:recebeu|ganhou|possui|possui a|possui o|tem|usa|usou|empunhou|perdeu)\b/.test(statement)
   ) {
     relationType = "owns"
-    relationStatus = /\b(?:perdeu|entregou|devolveu|abandonou)\b/.test(statement) ? "former" : "active"
+    relationStatus = /\b(?:perdeu|entregou|devolveu|abandonou)\b/.test(statement)
+      ? "former"
+      : "active"
     if (hasTemporaryPossessionLanguage(fact.statement)) return
   } else {
     const match = FACT_RELATION_KEYWORDS.find(({ keywords }) =>
@@ -1140,12 +1090,17 @@ function pushFactRelationProposal(
     target.to_entity = relatedName
   }
 
-  if (relatedEntity && relationStatus === "active" && relationAlreadyExists(
-    context.relations as Array<CanonicalMemoryRelation & { id: string }>,
-    subjectId,
-    relatedEntity.id,
-    relationType,
-  )) return
+  if (
+    relatedEntity &&
+    relationStatus === "active" &&
+    relationAlreadyExists(
+      context.relations as Array<CanonicalMemoryRelation & { id: string }>,
+      subjectId,
+      relatedEntity.id,
+      relationType,
+    )
+  )
+    return
 
   const existingRelation = relatedEntity
     ? (context.relations as Array<CanonicalMemoryRelation & { id: string }>).find(
@@ -1185,7 +1140,18 @@ function threadCanBeResolved(
   if (thread.status && !["open", "in_progress", "pending"].includes(thread.status)) return false
   const question = normalizePart(thread.question ?? `${thread.title} ${thread.description}`)
   const statement = normalizePart(fact.statement)
-  const relationTerms = ["irmao", "irma", "pai", "mae", "filho", "responsavel", "criou", "matou", "origem", "quem"]
+  const relationTerms = [
+    "irmao",
+    "irma",
+    "pai",
+    "mae",
+    "filho",
+    "responsavel",
+    "criou",
+    "matou",
+    "origem",
+    "quem",
+  ]
   const sharedRelationTerm = relationTerms.some(
     (term) => question.includes(term) && statement.includes(term),
   )
@@ -1193,7 +1159,9 @@ function threadCanBeResolved(
   const involvedNames = (thread.entity_ids ?? [])
     .map((id) => entities.find((entity) => entity.id === id)?.name)
     .filter((name): name is string => Boolean(name))
-  const allInvolvedMentioned = involvedNames.every((name) => statement.includes(normalizePart(name)))
+  const allInvolvedMentioned = involvedNames.every((name) =>
+    statement.includes(normalizePart(name)),
+  )
   return allInvolvedMentioned || involvedNames.length === 0
 }
 
@@ -1201,7 +1169,9 @@ function openThreadResolutionCandidates(
   context: CanonicalMemoryContext,
   proposals: CanonReconciliationProposal[],
 ) {
-  for (const thread of (context.openThreads ?? []) as Array<CanonicalMemoryOpenThread & { id: string }>) {
+  for (const thread of (context.openThreads ?? []) as Array<
+    CanonicalMemoryOpenThread & { id: string }
+  >) {
     for (const fact of context.facts as Array<CanonicalMemoryFact & { id: string }>) {
       if (!threadCanBeResolved(thread, fact, context.entities)) continue
       proposals.push(
@@ -1226,7 +1196,8 @@ function openThreadResolutionCandidates(
             { record_type: "open_thread", record_id: thread.id, role: "primary" },
             { record_type: "fact", record_id: fact.id, role: "supporting" },
           ],
-          explanation: "A afirmação canônica responde diretamente à pergunta da trama; não é apenas uma semelhança temática.",
+          explanation:
+            "A afirmação canônica responde diretamente à pergunta da trama; não é apenas uma semelhança temática.",
           evidence: fact.statement,
           certainty: "direct_derivation",
           confidence: 0.92,
@@ -1278,7 +1249,8 @@ function conflictCandidates(
             { record_type: "fact", record_id: left.id, role: "conflict" },
             { record_type: "fact", record_id: right.id, role: "conflict" },
           ],
-          explanation: "Os dois fatos parecem tratar do mesmo aspecto e não devem ser resolvidos automaticamente; os autores precisam revisar a temporalidade ou a contradição.",
+          explanation:
+            "Os dois fatos parecem tratar do mesmo aspecto e não devem ser resolvidos automaticamente; os autores precisam revisar a temporalidade ou a contradição.",
           evidence: `${left.statement} / ${right.statement}`,
           certainty: "possible_inference",
           confidence: 0.78,
@@ -1289,51 +1261,15 @@ function conflictCandidates(
   }
 }
 
+/**
+ * Compatibilidade temporária para consumidores antigos. A geração local de proposals foi removida:
+ * todas as consequências canônicas precisam ser produzidas pelo Ollama e passar por revisão humana.
+ */
 export function runCanonReconciliationRules(
-  context: CanonReconciliationRuleInput,
-  options: CanonReconciliationRuleOptions = {},
-) {
-  const proposals: CanonReconciliationProposal[] = []
-  const maxProposals = Math.max(
-    1,
-    options.maxProposals ?? CANON_RECONCILIATION_MAX_PROPOSALS,
-  )
-
-  attributeRelationCandidates(context.entities, proposals)
-  pushMentionedCharacterEntities(context, proposals)
-  for (const fact of context.facts as Array<CanonicalMemoryFact & { id: string }>) {
-    if (fact.status && fact.status !== "active") continue
-    pushFactRelationProposal(fact, context, proposals)
-  }
-  openThreadResolutionCandidates(context, proposals)
-  conflictCandidates(context, proposals)
-  duplicateEntityCandidates(context.entities, proposals)
-  duplicateFactCandidates(context.facts as Array<CanonicalMemoryFact & { id: string }>, proposals)
-  duplicateRelationCandidates(
-    context.relations as Array<CanonicalMemoryRelation & { id: string }>,
-    proposals,
-  )
-  duplicateEventCandidates(
-    (context.events ?? []) as Array<CanonicalMemoryEvent & { id: string }>,
-    proposals,
-  )
-  duplicateOpenThreadCandidates(
-    (context.openThreads ?? []) as Array<CanonicalMemoryOpenThread & { id: string }>,
-    proposals,
-  )
-
-  const unique = new Map<string, CanonReconciliationProposal>()
-  for (const proposal of proposals) {
-    if (!unique.has(proposal.dedupe_key)) unique.set(proposal.dedupe_key, proposal)
-  }
-
-  return [...unique.values()]
-    .sort((left, right) => {
-      const kindOrder = left.proposal_kind.localeCompare(right.proposal_kind)
-      if (kindOrder !== 0) return kindOrder
-      return left.title.localeCompare(right.title, "pt-BR")
-    })
-    .slice(0, maxProposals)
+  _context: CanonReconciliationRuleInput,
+  _options: CanonReconciliationRuleOptions = {},
+): CanonReconciliationProposal[] {
+  return []
 }
 
 export async function buildReconciliationInputHash(

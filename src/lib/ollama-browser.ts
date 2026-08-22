@@ -84,6 +84,7 @@ export type CanonicalMemoryFact = {
     | "other"
   subject_entity?: string | null
   related_entities?: string[]
+  mentioned_entities?: Array<string | { name: string; entity_type?: string }>
   scope?: "timeless" | "current" | "historical" | "temporary"
   certainty?: "explicit_fact" | "direct_derivation" | "possible_inference" | "author_defined"
   evidence?: string
@@ -119,7 +120,12 @@ export type CanonicalMemoryEvent = {
   event_kind?: string
   narrative_time?: string
   entity_ids?: string[]
-  participants?: Array<{ entity_name: string; role: string }>
+  participants?: Array<{
+    entity_id?: string
+    entity_name: string
+    role: string
+    entity_type?: string
+  }>
   outcomes?: string[]
   certainty?: "explicit_fact" | "direct_derivation" | "possible_inference" | "author_defined"
   source_kind?: string
@@ -1462,10 +1468,96 @@ export function mergeMemoryProposalsBrowser(
   return { ...merged, dedupe_key: memoryProposalKeyBrowser(merged) }
 }
 
-
 export type CanonReconciliationAiResult = {
   proposals: unknown[]
   done_reason?: string
+}
+
+function normalizeSemanticName(value: unknown) {
+  return String(value ?? "")
+    .normalize("NFD")
+    .replace(/[\u0300-\u036f]/g, "")
+    .toLocaleLowerCase("pt-BR")
+    .replace(/[^a-z0-9]+/g, " ")
+    .trim()
+}
+
+function entityMatchesReference(entity: CanonicalMemoryEntity, reference: unknown) {
+  const normalizedReference = normalizeSemanticName(reference)
+  if (!normalizedReference) return false
+  return [entity.id, entity.name, ...(entity.aliases ?? [])].some(
+    (value) => normalizeSemanticName(value) === normalizedReference,
+  )
+}
+
+function reconciliationSemanticReferences(context: CanonicalMemoryContext) {
+  const entities = context.entities
+  const factMentions = context.facts.flatMap((fact) => {
+    const mentioned = (fact.mentioned_entities ?? []).map((value) =>
+      typeof value === "string" ? { name: value } : value,
+    )
+    const related = (fact.related_entities ?? []).map((value) => ({ name: value }))
+    return mentioned.length || related.length
+      ? [
+          {
+            fact_id: fact.id ?? null,
+            subject_entity_id: fact.entity_id ?? null,
+            subject_entity: fact.subject_entity ?? null,
+            statement: fact.statement,
+            mentioned_entities: mentioned,
+            related_entities: related,
+            unresolved_mentions: [...mentioned, ...related].filter(
+              (reference) =>
+                !entities.some((entity) => entityMatchesReference(entity, reference.name)),
+            ),
+          },
+        ]
+      : []
+  })
+
+  const eventParticipants = (context.events ?? []).flatMap((event) => {
+    const participants = event.participants ?? []
+    return participants.length
+      ? [
+          {
+            event_id: event.id,
+            event_title: event.title,
+            description: event.description,
+            entity_ids: event.entity_ids ?? [],
+            participants,
+            unresolved_participants: participants.filter(
+              (participant) =>
+                !(
+                  participant.entity_id &&
+                  entities.some((entity) => entity.id === participant.entity_id)
+                ) &&
+                !entities.some((entity) => entityMatchesReference(entity, participant.entity_name)),
+            ),
+          },
+        ]
+      : []
+  })
+
+  const relationEndpointGaps = context.relations
+    .filter(
+      (relation) =>
+        !entities.some((entity) => entity.id === relation.from_entity_id) ||
+        !entities.some((entity) => entity.id === relation.to_entity_id),
+    )
+    .map((relation) => ({
+      relation_id: relation.id ?? null,
+      relation_type: relation.relation_type,
+      from_entity_id: relation.from_entity_id,
+      to_entity_id: relation.to_entity_id,
+      from_entity_exists: entities.some((entity) => entity.id === relation.from_entity_id),
+      to_entity_exists: entities.some((entity) => entity.id === relation.to_entity_id),
+    }))
+
+  return {
+    fact_mentions: factMentions.slice(0, 240),
+    event_participants: eventParticipants.slice(0, 160),
+    relation_endpoint_gaps: relationEndpointGaps.slice(0, 240),
+  }
 }
 
 function reconciliationContextJson(context: CanonicalMemoryContext) {
@@ -1476,16 +1568,13 @@ function reconciliationContextJson(context: CanonicalMemoryContext) {
     events: (context.events ?? []).slice(0, 160),
     open_threads: (context.openThreads ?? []).slice(0, 160),
     approved_sources: context.approvedSources ?? [],
+    semantic_references: reconciliationSemanticReferences(context),
   }
   return JSON.stringify(compact)
 }
 
-export function buildCanonReconciliationPrompt(
-  context: CanonicalMemoryContext,
-  deterministicCandidates: unknown[] = [],
-) {
+export function buildCanonReconciliationPrompt(context: CanonicalMemoryContext) {
   const contextJson = reconciliationContextJson(context).slice(0, 115000)
-  const candidatesJson = JSON.stringify(deterministicCandidates.slice(0, 80)).slice(0, 24000)
 
   return `Você é o Canon Reconciler de um Universo ficcional. Analise somente consequências estruturais diretamente sustentadas pelo cânone fornecido. Você NÃO está escrevendo a história, não está criando lore e não pode alterar o cânone. Sua saída será uma lista de propostas pendentes para revisão humana.
 
@@ -1497,9 +1586,13 @@ Regras obrigatórias:
 - Nunca invente UUID. Só use IDs existentes no contexto e em basis/target.
 - Não invente nomes, poderes, motivações, relações românticas, cronologia ou resolução de mistérios por teoria.
 - Uma inferência possível deve usar certainty=possible_inference e nunca deve ser aplicada automaticamente; prefira não propor inferências fracas.
+- Para cada item em semantic_references.fact_mentions, use a frase, mentioned_entities e related_entities para verificar se há uma pessoa, item ou poder citado que ainda não está em entities. Se a identificação for diretamente sustentada, proponha entity/create com knowledge_status=provisional; se houver ambiguidade, não crie apenas por capitalização.
+- Para cada item em semantic_references.event_participants, considere participants como evidência estruturada de quem participou e qual papel exerceu. Compare entity_id e entity_name com entities; quando um participante claramente for uma pessoa ainda ausente, proponha entity/create com entity_type=character e use o event_id como basis.
+- Para cada item em semantic_references.relation_endpoint_gaps, verifique os endpoints ausentes. Não invente UUID: só proponha uma entidade se o nome/identidade puder ser sustentado por facts, events ou texto fornecido; caso contrário, retorne [] para essa consequência.
 - Para relação, use payload.relation_type controlado: friend_of, sibling_of, parent_of, child_of, enemy_of, allied_with, member_of, owns, equipped_with, has_power, located_in, created_by, uses, associated_with ou other.
 - Para posse ou equipamento, não trate uma ação temporária como posse permanente. Para perda, prefira relation_status=former ou uma atualização histórica; nunca apague a relação.
 - Se um item, poder ou personagem for necessário para uma consequência diretamente sustentada e não existir, proponha entity/create com knowledge_status=provisional e atributos mínimos. Não invente detalhes.
+- Para personagens mencionadas em texto livre, esta é a única camada autorizada a fazer a identificação semântica. Nunca use apenas a inicial maiúscula, a posição no início da frase ou uma palavra isolada como evidência. Não crie entidades para verbos, adjetivos, hábitos, lutas, emoções, cargos, títulos, lugares, itens ou conceitos comuns. Só crie uma personagem quando o registro e a frase indicarem claramente que o termo é um indivíduo da história; use entity_type=character, evidence fiel e certainty=possible_inference quando houver qualquer ambiguidade.
 - Se uma thread aberta for respondida diretamente, proponha open_thread/resolve com target.record_id da thread e resolution.resolved_by referenciando os fatos/eventos usados. Similaridade temática não basta.
 - Se dois fatos parecerem conflitantes, proponha um alerta estruturado para revisão humana sem decidir qual é verdadeiro. Não arquive nenhum fato automaticamente.
 - Preserve a normalização: equipamentos, poderes, afiliações e família devem ser relações, não arrays dentro de entity.attributes.
@@ -1510,16 +1603,12 @@ Regras obrigatórias:
 CONTEXTO CANÔNICO V5:
 ${contextJson}
 
-CANDIDATOS DETERMINÍSTICOS PARA VALIDAR OU COMPLEMENTAR:
-${candidatesJson}
-
-Se os candidatos já cobrirem todas as consequências diretas, retorne somente as propostas adicionais que estejam faltando.`
+A revisão humana é obrigatória: sua resposta apenas sugere consequências; ela não aplica nenhuma alteração.`
 }
 
 export async function reconcileCanonWithOllama(
   model: string,
   context: CanonicalMemoryContext,
-  deterministicCandidates: unknown[] = [],
 ): Promise<CanonReconciliationAiResult> {
   const raw = await request<{ response?: string; done_reason?: string }>(
     "/api/generate",
@@ -1527,7 +1616,7 @@ export async function reconcileCanonWithOllama(
       method: "POST",
       body: JSON.stringify({
         model,
-        prompt: buildCanonReconciliationPrompt(context, deterministicCandidates),
+        prompt: buildCanonReconciliationPrompt(context),
         stream: false,
         think: false,
         format: "json",

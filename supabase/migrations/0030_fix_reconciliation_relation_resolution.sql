@@ -1,93 +1,5 @@
--- Fase B do Reconciliador de Cânone.
---
--- A IA continua sem permissão para escrever no cânone. Esta migration cria
--- apenas operações executáveis após uma decisão humana explícita:
---   1. revisão da proposta: pending -> approved/rejected;
---   2. aplicação: approved -> applied;
---   3. aplicação em lote, com uma única transação por livro.
---
--- As funções são SECURITY DEFINER porque a aplicação precisa ser atômica entre
--- tabelas relacionadas. A autorização não é delegada ao RLS: cada função
--- verifica associação ao livro, status da proposta e auth.uid().
-
-alter table public.canon_reconciliation_proposals
-  add column if not exists applied_by uuid references auth.users(id) on delete set null;
-
-alter table public.canon_reconciliation_proposals
-  add column if not exists applied_at timestamptz;
-
-alter table public.canon_reconciliation_proposals
-  add column if not exists apply_note text not null default '' check (char_length(apply_note) <= 4000);
-
-alter table public.canon_reconciliation_proposals
-  add column if not exists applied_records jsonb not null default '[]'::jsonb
-    check (jsonb_typeof(applied_records) = 'array');
-
-alter table public.canon_reconciliation_proposals
-  drop constraint if exists canon_reconciliation_proposals_status_check;
-
-alter table public.canon_reconciliation_proposals
-  add constraint canon_reconciliation_proposals_status_check
-  check (status in ('pending', 'approved', 'rejected', 'superseded', 'archived', 'applied'));
-
-alter table public.universe_entities
-  add column if not exists last_reconciliation_proposal_id uuid
-    references public.canon_reconciliation_proposals(id) on delete set null;
-
-alter table public.canon_facts
-  add column if not exists last_reconciliation_proposal_id uuid
-    references public.canon_reconciliation_proposals(id) on delete set null;
-
-alter table public.universe_relations
-  add column if not exists last_reconciliation_proposal_id uuid
-    references public.canon_reconciliation_proposals(id) on delete set null;
-
-alter table public.timeline_events
-  add column if not exists last_reconciliation_proposal_id uuid
-    references public.canon_reconciliation_proposals(id) on delete set null;
-
-alter table public.open_threads
-  add column if not exists last_reconciliation_proposal_id uuid
-    references public.canon_reconciliation_proposals(id) on delete set null;
-
-create index if not exists universe_entities_last_reconciliation_idx
-  on public.universe_entities (last_reconciliation_proposal_id)
-  where last_reconciliation_proposal_id is not null;
-
-create index if not exists canon_facts_last_reconciliation_idx
-  on public.canon_facts (last_reconciliation_proposal_id)
-  where last_reconciliation_proposal_id is not null;
-
-create index if not exists universe_relations_last_reconciliation_idx
-  on public.universe_relations (last_reconciliation_proposal_id)
-  where last_reconciliation_proposal_id is not null;
-
-create index if not exists timeline_events_last_reconciliation_idx
-  on public.timeline_events (last_reconciliation_proposal_id)
-  where last_reconciliation_proposal_id is not null;
-
-create index if not exists open_threads_last_reconciliation_idx
-  on public.open_threads (last_reconciliation_proposal_id)
-  where last_reconciliation_proposal_id is not null;
-
-create or replace function public.canon_reconciliation_uuid(candidate text)
-returns uuid
-language plpgsql
-immutable
-set search_path = public
-as $$
-begin
-  if candidate is null or btrim(candidate) = '' then
-    return null;
-  end if;
-
-  if candidate !~* '^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$' then
-    return null;
-  end if;
-
-  return candidate::uuid;
-end;
-$$;
+-- Corrige a resolução dos endpoints de relações para propostas já aprovadas.
+-- A RPC aceita tanto UUIDs quanto nomes/aliases de entidades do mesmo livro.
 
 create or replace function public.resolve_canon_reconciliation_entity(
   target_book_id uuid,
@@ -141,167 +53,12 @@ begin
 end;
 $$;
 
-create or replace function public.canon_reconciliation_uuid_array(
-  payload jsonb,
-  property_name text
-)
-returns uuid[]
-language plpgsql
-immutable
-set search_path = public
-as $$
-declare
-  items jsonb;
-  item jsonb;
-  result_ids uuid[] := '{}'::uuid[];
-  item_id uuid;
-  candidate text;
-begin
-  items := payload -> property_name;
-  if items is null or jsonb_typeof(items) <> 'array' then
-    return result_ids;
-  end if;
+revoke execute on function public.resolve_canon_reconciliation_entity(uuid, text) from public;
+grant execute on function public.resolve_canon_reconciliation_entity(uuid, text) to authenticated;
 
-  for item in select value from jsonb_array_elements(items) loop
-    candidate := case
-      when jsonb_typeof(item) = 'object'
-        then coalesce(item->>'id', item->>'record_id')
-      else item #>> '{}'
-    end;
-    item_id := public.canon_reconciliation_uuid(candidate);
-    if item_id is null then
-      raise exception 'O campo % contém um UUID inválido', property_name;
-    end if;
-    if not item_id = any(result_ids) then
-      result_ids := array_append(result_ids, item_id);
-    end if;
-  end loop;
-
-  return result_ids;
-end;
-$$;
-
-create or replace function public.canon_reconciliation_entity_ids(
-  target_book_id uuid,
-  payload jsonb
-)
-returns uuid[]
-language plpgsql
-security definer
-set search_path = public
-as $$
-declare
-  property_name text;
-  items jsonb;
-  item jsonb;
-  result_ids uuid[] := '{}'::uuid[];
-  entity_id uuid;
-  candidate text;
-begin
-  foreach property_name in array array['entity_ids', 'entities_involved', 'entities'] loop
-    items := payload -> property_name;
-    if items is null or jsonb_typeof(items) <> 'array' then
-      continue;
-    end if;
-
-    for item in select value from jsonb_array_elements(items) loop
-      candidate := case
-        when jsonb_typeof(item) = 'object'
-          then coalesce(item->>'id', item->>'entity_id', item->>'name', item->>'label')
-        else item #>> '{}'
-      end;
-      entity_id := public.resolve_canon_reconciliation_entity(target_book_id, candidate);
-      if entity_id is null then
-        raise exception 'A entidade % não foi encontrada neste livro', coalesce(candidate, '[vazio]');
-      end if;
-      if not entity_id = any(result_ids) then
-        result_ids := array_append(result_ids, entity_id);
-      end if;
-    end loop;
-  end loop;
-
-  return result_ids;
-end;
-$$;
-
-create or replace function public.review_canon_reconciliation_proposal(
-  target_proposal_id uuid,
-  requested_status text,
-  requested_title text default null,
-  requested_payload jsonb default null,
-  requested_review_note text default ''
-)
-returns jsonb
-language plpgsql
-security definer
-set search_path = public
-as $$
-declare
-  proposal public.canon_reconciliation_proposals;
-  next_title text;
-  next_payload jsonb;
-  note text;
-  actor_id uuid;
-  result jsonb;
-begin
-  actor_id := auth.uid();
-  if actor_id is null then
-    raise exception 'É necessário estar autenticado para revisar uma proposta';
-  end if;
-
-  if requested_status not in ('pending', 'approved', 'rejected') then
-    raise exception 'Status de revisão inválido';
-  end if;
-
-  select p.*
-    into proposal
-    from public.canon_reconciliation_proposals p
-   where p.id = target_proposal_id
-     and public.is_book_member(p.book_id)
-   for update;
-
-  if proposal.id is null then
-    raise exception 'Proposta não encontrada ou acesso negado';
-  end if;
-
-  if requested_status = 'pending' then
-    if proposal.status <> 'pending' then
-      raise exception 'Somente uma proposta pendente pode receber edição';
-    end if;
-  elsif proposal.status <> 'pending' then
-    raise exception 'Somente propostas pendentes podem ser aprovadas ou rejeitadas';
-  end if;
-
-  next_title := left(coalesce(nullif(btrim(requested_title), ''), proposal.title), 240);
-  if next_title = '' then
-    raise exception 'A proposta precisa ter um título';
-  end if;
-
-  next_payload := coalesce(requested_payload, proposal.payload);
-  if jsonb_typeof(next_payload) <> 'object' then
-    raise exception 'O payload da proposta precisa ser um objeto JSON';
-  end if;
-
-  note := left(coalesce(requested_review_note, ''), 4000);
-
-  update public.canon_reconciliation_proposals p
-     set title = next_title,
-         payload = next_payload,
-         status = requested_status,
-         reviewed_by = case when requested_status = 'pending' then p.reviewed_by else actor_id end,
-         reviewed_at = case when requested_status = 'pending' then p.reviewed_at else now() end,
-         review_note = case
-           when requested_status = 'pending' then note
-           when note <> '' then note
-           when requested_status = 'approved' then 'Aprovada pelos autores. A aplicação ao cânone requer ação explícita.'
-           else 'Rejeitada pelos autores. Não será aplicada ao cânone.'
-         end
-   where p.id = proposal.id
-   returning to_jsonb(p) into result;
-
-  return result;
-end;
-$$;
+-- Corrige a RPC de aplicação para bancos legados que ainda não possuem
+-- índices únicos nas tabelas de associação de eventos e threads.
+-- A migration 0028 continua recomendada, mas a aplicação não depende mais dela.
 
 create or replace function public.apply_canon_reconciliation_proposal(
   target_proposal_id uuid,
@@ -365,7 +122,7 @@ declare
 begin
   actor_id := auth.uid();
   if actor_id is null then
-    raise exception 'É necessário estar autenticado para aplicar uma proposta';
+    raise exception 'Ã‰ necessÃ¡rio estar autenticado para aplicar uma proposta';
   end if;
 
   select p.*
@@ -376,7 +133,7 @@ begin
    for update;
 
   if proposal.id is null then
-    raise exception 'Proposta não encontrada ou acesso negado';
+    raise exception 'Proposta nÃ£o encontrada ou acesso negado';
   end if;
 
   if proposal.status = 'applied' then
@@ -389,10 +146,10 @@ begin
   end if;
 
   if proposal.status <> 'approved' then
-    raise exception 'Somente propostas aprovadas podem ser aplicadas ao cânone';
+    raise exception 'Somente propostas aprovadas podem ser aplicadas ao cÃ¢none';
   end if;
 
-  applied_note := left(coalesce(nullif(btrim(requested_apply_note), ''), 'Aplicada pelos autores ao cânone.'), 4000);
+  applied_note := left(coalesce(nullif(btrim(requested_apply_note), ''), 'Aplicada pelos autores ao cÃ¢none.'), 4000);
   visibility := case when proposal.payload->>'visibility' = 'author_only' then 'author_only' else 'canon' end;
   source_kind := case when proposal.payload->>'source_kind' = 'manuscript' then 'manuscript' else 'author' end;
 
@@ -459,7 +216,7 @@ begin
     elsif proposal.operation = 'update' then
       target_id := public.canon_reconciliation_uuid(coalesce(proposal.target->>'record_id', proposal.target->>'id'));
       if target_id is null then
-        raise exception 'A atualização da entidade precisa de target.record_id';
+        raise exception 'A atualizaÃ§Ã£o da entidade precisa de target.record_id';
       end if;
 
       select e.*
@@ -470,7 +227,7 @@ begin
          and e.archived_at is null
        for update;
       if survivor_entity.id is null then
-        raise exception 'A entidade alvo não existe ou pertence a outro livro';
+        raise exception 'A entidade alvo nÃ£o existe ou pertence a outro livro';
       end if;
 
       entity_name := left(coalesce(nullif(btrim(proposal.payload->>'name'), ''), survivor_entity.name), 240);
@@ -518,7 +275,7 @@ begin
       survivor_id := public.canon_reconciliation_uuid(coalesce(proposal.payload->>'survivor_id', proposal.target->>'record_id'));
       source_ids := public.canon_reconciliation_uuid_array(proposal.payload, 'source_record_ids');
       if survivor_id is null or cardinality(source_ids) = 0 then
-        raise exception 'A consolidação de entidade precisa de survivor_id e source_record_ids';
+        raise exception 'A consolidaÃ§Ã£o de entidade precisa de survivor_id e source_record_ids';
       end if;
 
       select e.* into survivor_entity
@@ -528,7 +285,7 @@ begin
          and e.archived_at is null
        for update;
       if survivor_entity.id is null then
-        raise exception 'A entidade sobrevivente não existe ou pertence a outro livro';
+        raise exception 'A entidade sobrevivente nÃ£o existe ou pertence a outro livro';
       end if;
 
       source_count := 0;
@@ -544,7 +301,7 @@ begin
            and e.archived_at is null
          for update;
         if source_entity.id is null then
-          raise exception 'A entidade fonte % não existe ou já foi arquivada', source_id;
+          raise exception 'A entidade fonte % nÃ£o existe ou jÃ¡ foi arquivada', source_id;
         end if;
 
         update public.universe_entities survivor
@@ -658,11 +415,11 @@ begin
          set archived_at = now(), last_reconciliation_proposal_id = proposal.id
        where id = target_id and book_id = proposal.book_id and archived_at is null;
       if not found then
-        raise exception 'A entidade alvo não existe ou já foi arquivada';
+        raise exception 'A entidade alvo nÃ£o existe ou jÃ¡ foi arquivada';
       end if;
       result := jsonb_build_object('record_type', 'entity', 'entity_id', target_id, 'archived', true);
     else
-      raise exception 'A operação % não é válida para entidades', proposal.operation;
+      raise exception 'A operaÃ§Ã£o % nÃ£o Ã© vÃ¡lida para entidades', proposal.operation;
     end if;
 
   elsif proposal.proposal_kind = 'fact' then
@@ -670,14 +427,14 @@ begin
       created_record := false;
       statement := left(nullif(btrim(proposal.payload->>'statement'), ''), 4000);
       if statement is null then
-        raise exception 'O fato precisa ter uma afirmação';
+        raise exception 'O fato precisa ter uma afirmaÃ§Ã£o';
       end if;
       entity_id := public.resolve_canon_reconciliation_entity(
         proposal.book_id,
         coalesce(proposal.payload->>'entity_id', proposal.payload->>'entity_name')
       );
       if coalesce(proposal.payload->>'entity_id', proposal.payload->>'entity_name') is not null and entity_id is null then
-        raise exception 'A entidade vinculada ao fato não foi encontrada';
+        raise exception 'A entidade vinculada ao fato nÃ£o foi encontrada';
       end if;
       select f.id into existing_id
         from public.canon_facts f
@@ -712,14 +469,14 @@ begin
     elsif proposal.operation = 'update' then
       target_id := public.canon_reconciliation_uuid(coalesce(proposal.target->>'record_id', proposal.target->>'id'));
       if target_id is null then
-        raise exception 'A atualização do fato precisa de target.record_id';
+        raise exception 'A atualizaÃ§Ã£o do fato precisa de target.record_id';
       end if;
       select f.* into survivor_fact
         from public.canon_facts f
        where f.id = target_id and f.book_id = proposal.book_id and f.archived_at is null
        for update;
       if survivor_fact.id is null then
-        raise exception 'O fato alvo não existe ou pertence a outro livro';
+        raise exception 'O fato alvo nÃ£o existe ou pertence a outro livro';
       end if;
       statement := left(coalesce(nullif(btrim(proposal.payload->>'statement'), ''), survivor_fact.statement), 4000);
       visibility := case
@@ -733,7 +490,7 @@ begin
         else survivor_fact.entity_id
       end;
       if (proposal.payload ? 'entity_id' or proposal.payload ? 'entity_name') and entity_id is null then
-        raise exception 'A entidade vinculada ao fato não foi encontrada';
+        raise exception 'A entidade vinculada ao fato nÃ£o foi encontrada';
       end if;
       update public.canon_facts
          set entity_id = entity_id,
@@ -749,14 +506,14 @@ begin
       survivor_id := public.canon_reconciliation_uuid(coalesce(proposal.payload->>'survivor_id', proposal.target->>'record_id'));
       source_ids := public.canon_reconciliation_uuid_array(proposal.payload, 'source_record_ids');
       if survivor_id is null or cardinality(source_ids) = 0 then
-        raise exception 'A consolidação de fatos precisa de survivor_id e source_record_ids';
+        raise exception 'A consolidaÃ§Ã£o de fatos precisa de survivor_id e source_record_ids';
       end if;
       select f.* into survivor_fact
         from public.canon_facts f
        where f.id = survivor_id and f.book_id = proposal.book_id and f.archived_at is null
        for update;
       if survivor_fact.id is null then
-        raise exception 'O fato sobrevivente não existe ou pertence a outro livro';
+        raise exception 'O fato sobrevivente nÃ£o existe ou pertence a outro livro';
       end if;
       source_count := 0;
       foreach source_id in array source_ids loop
@@ -766,7 +523,7 @@ begin
          where f.id = source_id and f.book_id = proposal.book_id and f.archived_at is null
          for update;
         if source_fact.id is null then
-          raise exception 'O fato fonte % não existe ou já foi arquivado', source_id;
+          raise exception 'O fato fonte % nÃ£o existe ou jÃ¡ foi arquivado', source_id;
         end if;
         update public.canon_facts survivor
            set title = case when btrim(coalesce(survivor.title, '')) = '' then source_fact.title else survivor.title end,
@@ -788,10 +545,10 @@ begin
       update public.canon_facts
          set status = 'archived', archived_at = now(), last_reconciliation_proposal_id = proposal.id
        where id = target_id and book_id = proposal.book_id and archived_at is null;
-      if not found then raise exception 'O fato alvo não existe ou já foi arquivado'; end if;
+      if not found then raise exception 'O fato alvo nÃ£o existe ou jÃ¡ foi arquivado'; end if;
       result := jsonb_build_object('record_type', 'fact', 'fact_id', target_id, 'archived', true);
     else
-      raise exception 'A operação % não é válida para fatos', proposal.operation;
+      raise exception 'A operaÃ§Ã£o % nÃ£o Ã© vÃ¡lida para fatos', proposal.operation;
     end if;
 
   elsif proposal.proposal_kind = 'relation' then
@@ -801,9 +558,9 @@ begin
       to_entity_id := public.resolve_canon_reconciliation_entity(proposal.book_id, coalesce(proposal.target->>'to_entity_id', proposal.payload->>'to_entity_id', proposal.target->>'to_entity', proposal.payload->>'to_entity', proposal.target->>'to_entity_name', proposal.payload->>'to_entity_name'));
       relation_type := left(nullif(btrim(proposal.payload->>'relation_type'), ''), 160);
       relation_description := left(coalesce(proposal.payload->>'description', proposal.explanation), 4000);
-      if from_entity_id is null or to_entity_id is null then raise exception 'A relação precisa apontar para duas entidades do livro'; end if;
-      if from_entity_id = to_entity_id then raise exception 'Uma relação não pode apontar para a mesma entidade'; end if;
-      if relation_type is null then raise exception 'A relação precisa ter um tipo'; end if;
+      if from_entity_id is null or to_entity_id is null then raise exception 'A relaÃ§Ã£o precisa apontar para duas entidades do livro'; end if;
+      if from_entity_id = to_entity_id then raise exception 'Uma relaÃ§Ã£o nÃ£o pode apontar para a mesma entidade'; end if;
+      if relation_type is null then raise exception 'A relaÃ§Ã£o precisa ter um tipo'; end if;
       select r.id into existing_id
         from public.universe_relations r
        where r.book_id = proposal.book_id
@@ -835,12 +592,12 @@ begin
 
     elsif proposal.operation = 'update' then
       target_id := public.canon_reconciliation_uuid(coalesce(proposal.target->>'record_id', proposal.target->>'id'));
-      if target_id is null then raise exception 'A atualização da relação precisa de target.record_id'; end if;
+      if target_id is null then raise exception 'A atualizaÃ§Ã£o da relaÃ§Ã£o precisa de target.record_id'; end if;
       select r.* into relation_row
         from public.universe_relations r
        where r.id = target_id and r.book_id = proposal.book_id and r.archived_at is null
        for update;
-      if relation_row.id is null then raise exception 'A relação alvo não existe ou pertence a outro livro'; end if;
+      if relation_row.id is null then raise exception 'A relaÃ§Ã£o alvo nÃ£o existe ou pertence a outro livro'; end if;
       visibility := case
         when proposal.payload ? 'visibility' and proposal.payload->>'visibility' = 'author_only' then 'author_only'
         when proposal.payload ? 'visibility' then 'canon'
@@ -850,7 +607,7 @@ begin
       to_entity_id := case when proposal.payload ? 'to_entity_id' or proposal.payload ? 'to_entity' or proposal.payload ? 'to_entity_name' then public.resolve_canon_reconciliation_entity(proposal.book_id, coalesce(proposal.payload->>'to_entity_id', proposal.payload->>'to_entity', proposal.payload->>'to_entity_name')) else relation_row.to_entity_id end;
       relation_type := left(coalesce(nullif(btrim(proposal.payload->>'relation_type'), ''), relation_row.relation_type), 160);
       relation_description := left(coalesce(nullif(proposal.payload->>'description', ''), relation_row.description), 4000);
-      if from_entity_id is null or to_entity_id is null or from_entity_id = to_entity_id then raise exception 'Os endpoints da relação são inválidos'; end if;
+      if from_entity_id is null or to_entity_id is null or from_entity_id = to_entity_id then raise exception 'Os endpoints da relaÃ§Ã£o sÃ£o invÃ¡lidos'; end if;
       update public.universe_relations
          set from_entity_id = from_entity_id,
              to_entity_id = to_entity_id,
@@ -864,16 +621,16 @@ begin
     elsif proposal.operation = 'merge' then
       survivor_id := public.canon_reconciliation_uuid(coalesce(proposal.payload->>'survivor_id', proposal.target->>'record_id'));
       source_ids := public.canon_reconciliation_uuid_array(proposal.payload, 'source_record_ids');
-      if survivor_id is null or cardinality(source_ids) = 0 then raise exception 'A consolidação de relações precisa de survivor_id e source_record_ids'; end if;
+      if survivor_id is null or cardinality(source_ids) = 0 then raise exception 'A consolidaÃ§Ã£o de relaÃ§Ãµes precisa de survivor_id e source_record_ids'; end if;
       select r.* into relation_row from public.universe_relations r where r.id = survivor_id and r.book_id = proposal.book_id and r.archived_at is null for update;
-      if relation_row.id is null then raise exception 'A relação sobrevivente não existe ou pertence a outro livro'; end if;
+      if relation_row.id is null then raise exception 'A relaÃ§Ã£o sobrevivente nÃ£o existe ou pertence a outro livro'; end if;
       source_count := 0;
       foreach source_id in array source_ids loop
         if source_id = survivor_id then continue; end if;
         update public.universe_relations
            set archived_at = now(), last_reconciliation_proposal_id = proposal.id
          where id = source_id and book_id = proposal.book_id and archived_at is null;
-        if not found then raise exception 'A relação fonte % não existe ou já foi arquivada', source_id; end if;
+        if not found then raise exception 'A relaÃ§Ã£o fonte % nÃ£o existe ou jÃ¡ foi arquivada', source_id; end if;
         source_count := source_count + 1;
       end loop;
       update public.universe_relations set last_reconciliation_proposal_id = proposal.id where id = survivor_id;
@@ -881,12 +638,12 @@ begin
 
     elsif proposal.operation = 'archive' then
       target_id := public.canon_reconciliation_uuid(coalesce(proposal.target->>'record_id', proposal.target->>'id'));
-      if target_id is null then raise exception 'O arquivamento da relação precisa de target.record_id'; end if;
+      if target_id is null then raise exception 'O arquivamento da relaÃ§Ã£o precisa de target.record_id'; end if;
       update public.universe_relations set archived_at = now(), last_reconciliation_proposal_id = proposal.id where id = target_id and book_id = proposal.book_id and archived_at is null;
-      if not found then raise exception 'A relação alvo não existe ou já foi arquivada'; end if;
+      if not found then raise exception 'A relaÃ§Ã£o alvo nÃ£o existe ou jÃ¡ foi arquivada'; end if;
       result := jsonb_build_object('record_type', 'relation', 'relation_id', target_id, 'archived', true);
     else
-      raise exception 'A operação % não é válida para relações', proposal.operation;
+      raise exception 'A operaÃ§Ã£o % nÃ£o Ã© vÃ¡lida para relaÃ§Ãµes', proposal.operation;
     end if;
 
   elsif proposal.proposal_kind = 'event' then
@@ -921,9 +678,9 @@ begin
         ) returning id into existing_id;
       else
         target_id := public.canon_reconciliation_uuid(coalesce(proposal.target->>'record_id', proposal.target->>'id'));
-        if target_id is null then raise exception 'A atualização do evento precisa de target.record_id'; end if;
+        if target_id is null then raise exception 'A atualizaÃ§Ã£o do evento precisa de target.record_id'; end if;
         select e.* into survivor_event from public.timeline_events e where e.id = target_id and e.book_id = proposal.book_id and e.archived_at is null for update;
-        if survivor_event.id is null then raise exception 'O evento alvo não existe ou pertence a outro livro'; end if;
+        if survivor_event.id is null then raise exception 'O evento alvo nÃ£o existe ou pertence a outro livro'; end if;
         event_payload := public.normalize_memory_event_payload(
           coalesce(survivor_event.payload, '{}'::jsonb) || proposal.payload,
           coalesce(survivor_event.title, proposal.title)
@@ -986,14 +743,14 @@ begin
     elsif proposal.operation = 'merge' then
       survivor_id := public.canon_reconciliation_uuid(coalesce(proposal.payload->>'survivor_id', proposal.target->>'record_id'));
       source_ids := public.canon_reconciliation_uuid_array(proposal.payload, 'source_record_ids');
-      if survivor_id is null or cardinality(source_ids) = 0 then raise exception 'A consolidação de eventos precisa de survivor_id e source_record_ids'; end if;
+      if survivor_id is null or cardinality(source_ids) = 0 then raise exception 'A consolidaÃ§Ã£o de eventos precisa de survivor_id e source_record_ids'; end if;
       select e.* into survivor_event from public.timeline_events e where e.id = survivor_id and e.book_id = proposal.book_id and e.archived_at is null for update;
-      if survivor_event.id is null then raise exception 'O evento sobrevivente não existe ou pertence a outro livro'; end if;
+      if survivor_event.id is null then raise exception 'O evento sobrevivente nÃ£o existe ou pertence a outro livro'; end if;
       source_count := 0;
       foreach source_id in array source_ids loop
         if source_id = survivor_id then continue; end if;
         select e.* into source_event from public.timeline_events e where e.id = source_id and e.book_id = proposal.book_id and e.archived_at is null for update;
-        if source_event.id is null then raise exception 'O evento fonte % não existe ou já foi arquivado', source_id; end if;
+        if source_event.id is null then raise exception 'O evento fonte % nÃ£o existe ou jÃ¡ foi arquivado', source_id; end if;
         update public.timeline_events survivor
            set description = left(trim(both from concat_ws(chr(10) || chr(10), nullif(survivor.description, ''), nullif(source_event.description, ''))), 4000),
                evidence = left(trim(both from concat_ws(chr(10) || chr(10), nullif(survivor.evidence, ''), nullif(source_event.evidence, ''))), 10000),
@@ -1020,16 +777,16 @@ begin
       target_id := public.canon_reconciliation_uuid(coalesce(proposal.target->>'record_id', proposal.target->>'id'));
       if target_id is null then raise exception 'O arquivamento do evento precisa de target.record_id'; end if;
       update public.timeline_events set status = 'archived', archived_at = now(), last_reconciliation_proposal_id = proposal.id where id = target_id and book_id = proposal.book_id and archived_at is null;
-      if not found then raise exception 'O evento alvo não existe ou já foi arquivado'; end if;
+      if not found then raise exception 'O evento alvo nÃ£o existe ou jÃ¡ foi arquivado'; end if;
       result := jsonb_build_object('record_type', 'event', 'event_id', target_id, 'archived', true);
     else
-      raise exception 'A operação % não é válida para eventos', proposal.operation;
+      raise exception 'A operaÃ§Ã£o % nÃ£o Ã© vÃ¡lida para eventos', proposal.operation;
     end if;
 
   elsif proposal.proposal_kind = 'open_thread' then
     if proposal.operation in ('create', 'update', 'resolve') then
       thread_title := left(nullif(btrim(coalesce(proposal.payload->>'title', proposal.title)), ''), 240);
-      if thread_title is null then raise exception 'A trama aberta precisa de um título'; end if;
+      if thread_title is null then raise exception 'A trama aberta precisa de um tÃ­tulo'; end if;
       thread_description := left(coalesce(proposal.payload->>'description', ''), 4000);
       thread_status := case proposal.payload->>'status'
         when 'open' then 'open'
@@ -1058,9 +815,9 @@ begin
         ) returning id into existing_id;
       else
         target_id := public.canon_reconciliation_uuid(coalesce(proposal.target->>'record_id', proposal.target->>'id'));
-        if target_id is null then raise exception 'A atualização da trama precisa de target.record_id'; end if;
+        if target_id is null then raise exception 'A atualizaÃ§Ã£o da trama precisa de target.record_id'; end if;
         select t.* into survivor_thread from public.open_threads t where t.id = target_id and t.book_id = proposal.book_id and t.archived_at is null for update;
-        if survivor_thread.id is null then raise exception 'A trama alvo não existe ou pertence a outro livro'; end if;
+        if survivor_thread.id is null then raise exception 'A trama alvo nÃ£o existe ou pertence a outro livro'; end if;
         thread_title := left(coalesce(nullif(btrim(proposal.payload->>'title'), ''), survivor_thread.title), 240);
         if not (proposal.payload ? 'status') and proposal.operation <> 'resolve' then
           thread_status := survivor_thread.status;
@@ -1120,14 +877,14 @@ begin
     elsif proposal.operation = 'merge' then
       survivor_id := public.canon_reconciliation_uuid(coalesce(proposal.payload->>'survivor_id', proposal.target->>'record_id'));
       source_ids := public.canon_reconciliation_uuid_array(proposal.payload, 'source_record_ids');
-      if survivor_id is null or cardinality(source_ids) = 0 then raise exception 'A consolidação de tramas precisa de survivor_id e source_record_ids'; end if;
+      if survivor_id is null or cardinality(source_ids) = 0 then raise exception 'A consolidaÃ§Ã£o de tramas precisa de survivor_id e source_record_ids'; end if;
       select t.* into survivor_thread from public.open_threads t where t.id = survivor_id and t.book_id = proposal.book_id and t.archived_at is null for update;
-      if survivor_thread.id is null then raise exception 'A trama sobrevivente não existe ou pertence a outro livro'; end if;
+      if survivor_thread.id is null then raise exception 'A trama sobrevivente nÃ£o existe ou pertence a outro livro'; end if;
       source_count := 0;
       foreach source_id in array source_ids loop
         if source_id = survivor_id then continue; end if;
         select t.* into source_thread from public.open_threads t where t.id = source_id and t.book_id = proposal.book_id and t.archived_at is null for update;
-        if source_thread.id is null then raise exception 'A trama fonte % não existe ou já foi arquivada', source_id; end if;
+        if source_thread.id is null then raise exception 'A trama fonte % nÃ£o existe ou jÃ¡ foi arquivada', source_id; end if;
         update public.open_threads survivor
            set description = left(trim(both from concat_ws(chr(10) || chr(10), nullif(survivor.description, ''), nullif(source_thread.description, ''))), 4000),
                evidence = left(trim(both from concat_ws(chr(10) || chr(10), nullif(survivor.evidence, ''), nullif(source_thread.evidence, ''))), 10000),
@@ -1154,13 +911,13 @@ begin
       target_id := public.canon_reconciliation_uuid(coalesce(proposal.target->>'record_id', proposal.target->>'id'));
       if target_id is null then raise exception 'O arquivamento da trama precisa de target.record_id'; end if;
       update public.open_threads set archived_at = now(), last_reconciliation_proposal_id = proposal.id where id = target_id and book_id = proposal.book_id and archived_at is null;
-      if not found then raise exception 'A trama alvo não existe ou já foi arquivada'; end if;
+      if not found then raise exception 'A trama alvo nÃ£o existe ou jÃ¡ foi arquivada'; end if;
       result := jsonb_build_object('record_type', 'open_thread', 'thread_id', target_id, 'archived', true);
     else
-      raise exception 'A operação % não é válida para tramas abertas', proposal.operation;
+      raise exception 'A operaÃ§Ã£o % nÃ£o Ã© vÃ¡lida para tramas abertas', proposal.operation;
     end if;
   else
-    raise exception 'Tipo de proposta de reconciliação inválido';
+    raise exception 'Tipo de proposta de reconciliaÃ§Ã£o invÃ¡lido';
   end if;
 
   update public.canon_reconciliation_proposals
@@ -1172,7 +929,7 @@ begin
    where id = proposal.id and status = 'approved';
 
   if not found then
-    raise exception 'A proposta mudou de estado antes da aplicação';
+    raise exception 'A proposta mudou de estado antes da aplicaÃ§Ã£o';
   end if;
 
   return result || jsonb_build_object(
@@ -1182,94 +939,3 @@ begin
   );
 end;
 $$;
-
-create or replace function public.apply_approved_canon_reconciliation(
-  target_book_id uuid,
-  requested_apply_note text default ''
-)
-returns jsonb
-language plpgsql
-security definer
-set search_path = public
-as $$
-declare
-  actor_id uuid;
-  proposal_id uuid;
-  result jsonb;
-  results jsonb := '[]'::jsonb;
-  applied_count integer := 0;
-begin
-  actor_id := auth.uid();
-  if actor_id is null then
-    raise exception 'É necessário estar autenticado para aplicar propostas';
-  end if;
-  if not public.is_book_member(target_book_id) then
-    raise exception 'Livro não encontrado ou acesso negado';
-  end if;
-
-  perform pg_advisory_xact_lock(hashtextextended(target_book_id::text, 2));
-
-  for proposal_id in
-    select p.id
-      from public.canon_reconciliation_proposals p
-     where p.book_id = target_book_id
-       and p.status = 'approved'
-     order by case
-       when p.proposal_kind = 'entity' and p.operation = 'create' then 0
-       when p.proposal_kind = 'entity' then 1
-       when p.proposal_kind = 'fact' and p.operation = 'create' then 2
-       when p.proposal_kind = 'relation' then 3
-       when p.proposal_kind = 'event' then 4
-       when p.proposal_kind = 'open_thread' then 5
-       else 6
-     end,
-     p.created_at,
-     p.id
-     for update
-  loop
-    result := public.apply_canon_reconciliation_proposal(proposal_id, requested_apply_note);
-    results := results || jsonb_build_array(result);
-    applied_count := applied_count + 1;
-  end loop;
-
-  return jsonb_build_object(
-    'book_id', target_book_id,
-    'status', 'completed',
-    'applied_count', applied_count,
-    'results', results
-  );
-end;
-$$;
-
--- A revisão e a aplicação passam a usar RPCs SECURITY DEFINER com validação
--- explícita. Isso evita que o cliente altere status, applied_records ou
--- proveniência diretamente via PostgREST.
-revoke execute on function public.resolve_canon_reconciliation_entity(uuid, text) from public;
-revoke execute on function public.canon_reconciliation_uuid_array(jsonb, text) from public;
-revoke execute on function public.canon_reconciliation_entity_ids(uuid, jsonb) from public;
-revoke execute on function public.review_canon_reconciliation_proposal(uuid, text, text, jsonb, text) from public;
-revoke execute on function public.apply_canon_reconciliation_proposal(uuid, text) from public;
-revoke execute on function public.apply_approved_canon_reconciliation(uuid, text) from public;
-revoke update on public.canon_reconciliation_proposals from authenticated;
-revoke update on public.canon_reconciliation_runs from authenticated;
-
-grant execute on function public.canon_reconciliation_uuid(text) to authenticated;
-grant execute on function public.resolve_canon_reconciliation_entity(uuid, text) to authenticated;
-grant execute on function public.canon_reconciliation_uuid_array(jsonb, text) to authenticated;
-grant execute on function public.canon_reconciliation_entity_ids(uuid, jsonb) to authenticated;
-grant execute on function public.review_canon_reconciliation_proposal(uuid, text, text, jsonb, text) to authenticated;
-grant execute on function public.apply_canon_reconciliation_proposal(uuid, text) to authenticated;
-grant execute on function public.apply_approved_canon_reconciliation(uuid, text) to authenticated;
-
-comment on column public.canon_reconciliation_proposals.applied_records is
-  'Registros canônicos efetivamente afetados pela aplicação humana da proposta.';
-comment on column public.universe_entities.last_reconciliation_proposal_id is
-  'Última proposta de reconciliação humana que afetou esta entidade.';
-comment on column public.canon_facts.last_reconciliation_proposal_id is
-  'Última proposta de reconciliação humana que afetou este fato.';
-comment on column public.universe_relations.last_reconciliation_proposal_id is
-  'Última proposta de reconciliação humana que afetou esta relação.';
-comment on column public.timeline_events.last_reconciliation_proposal_id is
-  'Última proposta de reconciliação humana que afetou este evento.';
-comment on column public.open_threads.last_reconciliation_proposal_id is
-  'Última proposta de reconciliação humana que afetou esta trama.';

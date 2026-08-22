@@ -6,25 +6,26 @@ Evoluir o reconciliador atual, que hoje executa somente regras locais de atribut
 
 ## Linha de base auditada
 
-A execução em `src/app/app/livro/[bookId]/universo/CanonReconciliationPanel.tsx` chama apenas `runCanonReconciliationRules`. O motor em `src/lib/canon-reconciler-browser.ts` contém uma regra limitada para converter alguns atributos de entidades em relações e regras de merge para entidades, fatos, relações, eventos e tramas. Não há chamada ao Ollama nem prompt `CANON_RECONCILIATION_V1` no caminho do reconciliador.
+A linha de base histórica executava apenas `runCanonReconciliationRules`, com regras locais de atributos e deduplicação. Após o sprint, o painel deixou de usar esse motor: `reconcileCanonWithOllama` é o único caminho de geração, recebe o contrato V5 e grava somente proposals pendentes para revisão humana. A API local legada permanece como compatibilidade e retorna sempre uma lista vazia; ela não cria proposals.
 
 A infraestrutura de runs, fontes, propostas pendentes, aprovação humana e aplicação atômica já existe nas migrations `0025_canon_reconciliation_foundation.sql` e `0026_canon_reconciliation_apply.sql`, mas precisa ser alinhada aos payloads V5 para suportar corretamente relações, resolução de threads, provenance e transições de estado.
 
 ## Correspondência com o plano original
 
-| Plano original | Implementação do sprint | Situação |
-| --- | --- | --- |
-| Auditoria antes da implementação | Checklist, preservação das alterações locais e revisão das migrations e do fluxo atual | Concluído |
-| Contrato `UNIVERSE_CONTRACT_V5` | Tipos, schemas de validação e adapter V4→V5 | A implementar |
-| Rule Engine antes da IA | Fatos de posse, parentesco, afiliação, poderes, itens, localização, criação, perda e estado | A implementar |
-| `CANON_RECONCILIATION_V1` | Prompt separado, contexto limitado e retorno JSON V5 | A implementar |
-| Context Builder dedicado | Entradas aprovadas + contexto relacionado, sem enviar o Universo inteiro por padrão | A implementar |
-| Resolução de open threads | Relação direta entre fatos/eventos e pergunta da thread | A implementar |
-| Entidades provisórias | Criação proposta para itens, poderes e personagens citados sem registro | A implementar |
-| Conflitos e temporalidade | Alertas de conflito e transição active/former ou equivalente sem apagar histórico | A implementar |
-| Provenance e prevenção de loops | Origem, basis, run e bloqueio de auto-reconciliação da própria derivação | A implementar |
-| UI e aplicação atômica | Cards por tipo de operação, revisão humana, aplicação explícita e idempotência | Parcial; revisar |
-| QA de Eleutheria | Casos de Cod, Ignitus, Kalel, Daiki, Nishiki e Ventos de Destruição | A implementar |
+| Plano original                   | Implementação do sprint                                                                                     | Situação                                            |
+| -------------------------------- | ----------------------------------------------------------------------------------------------------------- | --------------------------------------------------- |
+| Auditoria antes da implementação | Checklist, preservação das alterações locais e revisão das migrations e do fluxo atual                      | Concluído                                           |
+| Contrato `UNIVERSE_CONTRACT_V5`  | Tipos, schemas de validação e adapter V4→V5                                                                 | Concluído                                           |
+| Geração de consequências pela IA | `reconcileCanonWithOllama` como único produtor; motor local legado desativado                               | Concluído                                           |
+| `CANON_RECONCILIATION_V1`        | Prompt separado, contexto limitado e retorno JSON V5                                                        | Concluído                                           |
+| Context Builder dedicado         | Entradas aprovadas + contexto relacionado, com `fact_mentions`, `event_participants` e lacunas de endpoints | Concluído                                           |
+| Resolução de open threads        | Instrução explícita para relação direta entre fatos/eventos e pergunta da thread                            | Concluído                                           |
+| Entidades provisórias            | Instrução semântica para itens, poderes e personagens citados sem registro                                  | Concluído                                           |
+| Conflitos e temporalidade        | Instruções para alertas de conflito e transição `active/former` sem apagar histórico                        | Concluído                                           |
+| Provenance e prevenção de loops  | Origem, basis, run e bloqueio de auto-reconciliação da própria derivação                                    | Concluído                                           |
+| UI e aplicação atômica           | Cards por tipo de operação, revisão humana, aplicação explícita e idempotência                              | Concluído                                           |
+| QA de Eleutheria                 | Smoke test do contexto/prompt e validação da ausência de proposals determinísticas                          | Concluído; cobertura Ollama depende de modelo local |
+| Migrations de aplicação          | `0028` → `0030` → `0031` precisam ser aplicadas manualmente no Supabase                                     | Pendente operacional                                |
 
 ## Critérios de aceite deste sprint
 
@@ -38,7 +39,7 @@ A infraestrutura de runs, fontes, propostas pendentes, aprovação humana e apli
 8. Cada proposta possui `basis`, `evidence`, `certainty`, `source_anchor` e `reconciliation_run_id` rastreável.
 9. Reexecutar sobre as mesmas fontes não cria propostas equivalentes duplicadas.
 10. O caminho de IA usa o contexto de reconciliação e o Ollama local, mantendo a aprovação humana e sem escrita automática no cânone.
-11. Os casos de QA do plano original são executáveis e cobrem pelo menos relações, equipamentos, poderes, entidades provisórias, threads, conflitos e mudanças temporais.
+11. O smoke test valida o contrato do prompt, menções de Jhin/Elise, participantes com papéis, endpoints ausentes, guardrails contra falsos positivos e que o motor local retorna zero proposals; a resposta real do Ollama deve ser validada com um modelo local selecionado.
 12. TypeScript, lint e build passam; falhas preexistentes são separadas das introduzidas pelo sprint.
 
 ## Guardrails

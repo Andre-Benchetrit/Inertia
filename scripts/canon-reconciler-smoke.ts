@@ -1,5 +1,8 @@
 import { runCanonReconciliationRules } from "../src/lib/canon-reconciler-browser"
-import type { CanonicalMemoryContext } from "../src/lib/ollama-browser"
+import {
+  buildCanonReconciliationPrompt,
+  type CanonicalMemoryContext,
+} from "../src/lib/ollama-browser"
 
 const context: CanonicalMemoryContext = {
   entities: [
@@ -17,48 +20,58 @@ const context: CanonicalMemoryContext = {
       status: "active",
     },
     {
-      id: "fact-item",
-      entity_id: "daiki",
-      statement: "Daiki recebeu a Espada Verde.",
-      fact_type: "possession",
-      status: "active",
-    },
-    {
-      id: "fact-power",
-      entity_id: "cod",
-      statement: "Cod possui poderes de gelo.",
-      fact_type: "ability",
-      status: "active",
-    },
-    {
-      id: "fact-eyes-a",
-      entity_id: "daiki",
-      statement: "Daiki possui olhos cor de mel.",
-      fact_type: "appearance",
-      status: "active",
-    },
-    {
-      id: "fact-eyes-b",
-      entity_id: "daiki",
-      statement: "Daiki sempre teve olhos azuis.",
-      fact_type: "appearance",
-      status: "active",
-    },
-    {
-      id: "fact-hate",
-      entity_id: "cod",
-      statement: "Cod odiava X.",
-      status: "active",
-    },
-    {
       id: "fact-jhin",
       entity_id: "cod",
       statement: "Cod encontrou Jhin na estrada.",
+      mentioned_entities: [{ name: "Jhin", entity_type: "character" }],
+      status: "active",
+    },
+    {
+      id: "fact-elise",
+      entity_id: "cod",
+      statement: "A luta revelou o hábito de Elise.",
+      mentioned_entities: [{ name: "Elise", entity_type: "character" }],
+      status: "active",
+    },
+    {
+      id: "fact-generic-words",
+      entity_id: "cod",
+      statement: "Luta e hábito são descritos como conceitos da cena.",
       status: "active",
     },
   ],
-  relations: [],
-  events: [],
+  relations: [
+    {
+      id: "relation-missing-endpoint",
+      from_entity_id: "cod",
+      to_entity_id: "jhin-unknown-id",
+      relation_type: "associated_with",
+      relation_status: "unknown",
+    },
+  ],
+  events: [
+    {
+      id: "event-jhin",
+      title: "Encontro na estrada",
+      description: "Cod encontrou Jhin na estrada.",
+      event_kind: "encounter",
+      entity_ids: ["cod"],
+      participants: [
+        { entity_name: "Cod", entity_id: "cod", entity_type: "character", role: "protagonist" },
+        { entity_name: "Jhin", entity_type: "character", role: "encountered" },
+      ],
+      status: "active",
+    },
+    {
+      id: "event-elise",
+      title: "Observação de Elise",
+      description: "Elise observou a cena.",
+      event_kind: "observation",
+      entity_ids: ["cod"],
+      participants: [{ entity_name: "Elise", entity_type: "character", role: "witness" }],
+      status: "active",
+    },
+  ],
   openThreads: [
     {
       id: "thread-sibling",
@@ -68,107 +81,56 @@ const context: CanonicalMemoryContext = {
       status: "open",
       entity_ids: ["ignitus"],
     },
-    {
-      id: "thread-killer",
-      title: "Responsável pela morte de X",
-      question: "Quem matou X?",
-      description: "O responsável ainda não foi revelado.",
-      status: "open",
-      entity_ids: [],
-    },
   ],
 }
-
-const proposals = runCanonReconciliationRules(context)
-const titles = proposals.map((proposal) => `${proposal.proposal_kind}/${proposal.operation}:${proposal.title}`)
 
 function assert(condition: unknown, message: string) {
   if (!condition) throw new Error(message)
 }
 
+const prompt = buildCanonReconciliationPrompt(context)
+const legacyRuleProposals = runCanonReconciliationRules(context)
+
 assert(
-  proposals.some(
-    (proposal) =>
-      proposal.proposal_kind === "relation" &&
-      proposal.operation === "create" &&
-      proposal.payload.relation_type === "sibling_of",
-  ),
-  "Não gerou sibling_of para Cod e Ignitus.",
+  legacyRuleProposals.length === 0,
+  "O motor local legado ainda está gerando proposals; a geração deve ser exclusiva do Ollama.",
+)
+assert(prompt.includes('"semantic_references"'), "O prompt não expõe semantic_references.")
+assert(prompt.includes('"fact_mentions"'), "O prompt não expõe fact_mentions.")
+assert(prompt.includes('"event_participants"'), "O prompt não expõe event_participants.")
+assert(prompt.includes('"relation_endpoint_gaps"'), "O prompt não expõe relation_endpoint_gaps.")
+assert(prompt.includes('"unresolved_mentions"'), "O prompt não calcula menções não cadastradas.")
+assert(
+  prompt.includes('"unresolved_participants"'),
+  "O prompt não calcula participantes não cadastrados.",
+)
+assert(prompt.includes("Cod encontrou Jhin na estrada"), "O fato de Jhin não chegou ao prompt.")
+assert(prompt.includes('"name":"Jhin"'), "A menção estruturada de Jhin não chegou ao prompt.")
+assert(prompt.includes('"name":"Elise"'), "A menção estruturada de Elise não chegou ao prompt.")
+assert(prompt.includes('"role":"encountered"'), "O papel de Jhin no evento não chegou ao prompt.")
+assert(prompt.includes('"role":"witness"'), "O papel de Elise no evento não chegou ao prompt.")
+assert(prompt.includes("Jhin"), "Jhin não está presente no contexto textual do prompt.")
+assert(prompt.includes("Elise"), "Elise não está presente no contexto textual do prompt.")
+assert(
+  prompt.includes("Não crie entidades para verbos, adjetivos, hábitos, lutas"),
+  "A proteção contra falsos positivos não chegou ao prompt.",
 )
 assert(
-  proposals.some(
-    (proposal) =>
-      proposal.proposal_kind === "entity" &&
-      proposal.operation === "create" &&
-      proposal.payload.entity_type === "item" &&
-      proposal.payload.name === "Espada Verde",
-  ),
-  "Não gerou entidade provisória para Espada Verde.",
+  prompt.includes("A revisão humana é obrigatória"),
+  "A exigência de aprovação humana não chegou ao prompt.",
 )
 assert(
-  proposals.some(
-    (proposal) =>
-      proposal.proposal_kind === "relation" && proposal.payload.relation_type === "owns",
-  ),
-  "Não gerou relação de posse para Espada Verde.",
+  !prompt.includes("CANDIDATOS DETERMINÍSTICOS"),
+  "O prompt ainda depende de candidatos determinísticos.",
 )
 assert(
-  proposals.some(
-    (proposal) =>
-      proposal.proposal_kind === "entity" &&
-      proposal.payload.entity_type === "power" &&
-      String(proposal.payload.name).toLocaleLowerCase().includes("gelo"),
-  ),
-  "Não gerou entidade provisória para o poder de gelo.",
-)
-assert(
-  proposals.some(
-    (proposal) =>
-      proposal.proposal_kind === "entity" &&
-      proposal.payload.entity_type === "character" &&
-      proposal.payload.name === "Jhin",
-  ),
-  "Não gerou entidade provisória para a personagem Jhin.",
-)
-assert(
-  !proposals.some(
-    (proposal) =>
-      proposal.proposal_kind === "entity" &&
-      ["Irmão", "Quem", "Responsável"].includes(String(proposal.payload.name)),
-  ),
-  "Criou entidade provisória a partir de palavra genérica de thread.",
-)
-assert(
-  proposals.some(
-    (proposal) =>
-      proposal.proposal_kind === "relation" && proposal.payload.relation_type === "has_power",
-  ),
-  "Não gerou relação has_power.",
-)
-assert(
-  proposals.some(
-    (proposal) =>
-      proposal.proposal_kind === "open_thread" &&
-      proposal.operation === "resolve" &&
-      proposal.target.record_id === "thread-sibling",
-  ),
-  "Não resolveu a thread respondida diretamente.",
-)
-assert(
-  !proposals.some(
-    (proposal) =>
-      proposal.proposal_kind === "open_thread" &&
-      proposal.operation === "resolve" &&
-      proposal.target.record_id === "thread-killer",
-  ),
-  "Resolveu indevidamente a thread de quem matou X.",
-)
-assert(
-  proposals.some(
-    (proposal) => proposal.proposal_kind === "open_thread" && proposal.payload.conflict_fact_ids,
-  ),
-  "Não gerou alerta de possível conflito.",
+  !prompt.includes("runCanonReconciliationRules"),
+  "O prompt referencia o motor determinístico local.",
 )
 
-console.log(`OK — ${proposals.length} propostas semânticas geradas.`)
-for (const title of titles) console.log(title)
+console.log(
+  "OK — contexto V5 e prompt Ollama carregam menções, participantes, endpoints e guardrails de revisão humana.",
+)
+console.log(
+  "Fluxo validado: a geração de proposals fica exclusivamente no Ollama; o smoke test não executa regras locais.",
+)

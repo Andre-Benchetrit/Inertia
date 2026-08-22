@@ -41,6 +41,7 @@ type CanonFact = {
   title: string
   statement: string
   evidence: string
+  mentioned_entities?: Array<string | { name: string; entity_type?: string }>
   visibility: Visibility
   status: string
   archived_at: string | null
@@ -533,11 +534,13 @@ export default function UniversePage() {
       facts: facts.map((fact) => ({
         id: fact.id,
         entity_id: fact.entity_id,
-        subject_entity:
-          fact.entity_id ? entities.find((entity) => entity.id === fact.entity_id)?.name ?? null : null,
+        subject_entity: fact.entity_id
+          ? (entities.find((entity) => entity.id === fact.entity_id)?.name ?? null)
+          : null,
         title: fact.title,
         statement: fact.statement,
         evidence: fact.evidence,
+        mentioned_entities: fact.mentioned_entities,
         source_kind: "author",
         certainty: "explicit_fact" as const,
         visibility: fact.visibility,
@@ -548,7 +551,7 @@ export default function UniversePage() {
         from_entity_id: relation.from_entity_id,
         to_entity_id: relation.to_entity_id,
         relation_type: relation.relation_type,
-        relation_status: relation.archived_at ? "former" as const : "active" as const,
+        relation_status: relation.archived_at ? ("former" as const) : ("active" as const),
         description: relation.description,
         source_kind: "author",
         certainty: "explicit_fact" as const,
@@ -564,15 +567,37 @@ export default function UniversePage() {
         outcomes: Array.isArray(event.payload?.outcomes)
           ? event.payload.outcomes.filter((item): item is string => typeof item === "string")
           : [],
-        participants: Array.isArray(event.payload?.participants)
-          ? event.payload.participants.filter(
-              (item): item is { entity_name: string; role: string } =>
-                Boolean(item) &&
-                typeof item === "object" &&
-                typeof (item as { entity_name?: unknown }).entity_name === "string" &&
-                typeof (item as { role?: unknown }).role === "string",
-            )
-          : [],
+        participants: [
+          ...(Array.isArray(event.payload?.participants)
+            ? event.payload.participants.filter(
+                (
+                  item,
+                ): item is {
+                  entity_name: string
+                  role: string
+                  entity_id?: string
+                  entity_type?: string
+                } =>
+                  Boolean(item) &&
+                  typeof item === "object" &&
+                  typeof (item as { entity_name?: unknown }).entity_name === "string" &&
+                  typeof (item as { role?: unknown }).role === "string",
+              )
+            : []),
+          ...event.entity_ids.flatMap((entityId) => {
+            const entity = entities.find((item) => item.id === entityId)
+            return entity
+              ? [
+                  {
+                    entity_id: entity.id,
+                    entity_name: entity.name,
+                    entity_type: entity.entity_type,
+                    role: "participant",
+                  },
+                ]
+              : []
+          }),
+        ],
         certainty: "explicit_fact" as const,
         source_kind: "author",
         visibility: event.visibility,

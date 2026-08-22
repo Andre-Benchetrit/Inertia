@@ -1,10 +1,7 @@
 "use client"
 
 import { useEffect, useMemo, useState } from "react"
-import {
-  reconcileCanonWithOllama,
-  type CanonicalMemoryContext,
-} from "@/lib/ollama-browser"
+import { reconcileCanonWithOllama, type CanonicalMemoryContext } from "@/lib/ollama-browser"
 import { createSupabaseBrowserClient } from "@/lib/supabase-browser"
 import {
   adaptCanonContextToV5,
@@ -14,7 +11,6 @@ import {
   CANON_RECONCILIATION_PROMPT_VERSION,
   CANON_RECONCILIATION_SCHEMA_VERSION,
   normalizeCanonReconciliationProposals,
-  runCanonReconciliationRules,
   type CanonReconciliationProposal,
   type ReconciliationBasisReference,
   type ReconciliationSource,
@@ -101,6 +97,13 @@ const recordTypeLabels: Record<ReconciliationBasisReference["record_type"], stri
   relation: "Relação",
   event: "Evento",
   open_thread: "Trama",
+}
+
+function analysisOriginLabel(proposal: CanonReconciliationProposal) {
+  const origin = proposal.payload?.analysis_origin
+  if (origin === "ollama") return "Proposta pela IA (Ollama)"
+  if (origin === "rule_engine") return "Proposta por regra determinística"
+  return "Origem não identificada"
 }
 
 const relationLabels: Record<string, string> = {
@@ -442,7 +445,12 @@ export default function CanonReconciliationPanel({
     let runId = ""
     let processedSources = 0
     try {
-      const modelName = window.localStorage.getItem("inertia:ollama:model") || "rule-engine"
+      const modelName = window.localStorage.getItem("inertia:ollama:model") || ""
+      if (!modelName || modelName === "rule-engine") {
+        throw new Error(
+          "Selecione um modelo do Ollama para gerar propostas semânticas. O reconciliador não usa regras determinísticas para criar proposals.",
+        )
+      }
       const inputHash = await buildReconciliationInputHash(
         sources,
         CANON_RECONCILIATION_SCHEMA_VERSION,
@@ -477,25 +485,27 @@ export default function CanonReconciliationPanel({
       processedSources = sources.length
 
       const reconciliationContext = adaptCanonContextToV5({ ...context, approvedSources: sources })
-      const deterministicGenerated = runCanonReconciliationRules(
-        reconciliationContext,
-        { maxProposals: CANON_RECONCILIATION_MAX_PROPOSALS },
-      )
       let aiGenerated: unknown[] = []
       let aiError = ""
-      if (modelName !== "rule-engine") {
-        try {
-          const aiResult = await reconcileCanonWithOllama(
-            modelName,
-            reconciliationContext,
-            deterministicGenerated,
-          )
-          aiGenerated = aiResult.proposals
-        } catch (caught) {
-          aiError = formatError(caught, "O Ollama não conseguiu analisar as consequências semânticas.")
-        }
+      try {
+        const aiResult = await reconcileCanonWithOllama(modelName, reconciliationContext)
+        aiGenerated = aiResult.proposals.map((item) => {
+          if (!isObject(item)) return item
+          return {
+            ...item,
+            payload: {
+              ...(isObject(item.payload) ? item.payload : {}),
+              analysis_origin: "ollama",
+            },
+          }
+        })
+      } catch (caught) {
+        aiError = formatError(
+          caught,
+          "O Ollama não conseguiu analisar as consequências semânticas.",
+        )
       }
-      const generated = [...deterministicGenerated, ...aiGenerated]
+      const generated = aiGenerated
       const normalized = normalizeCanonReconciliationProposals(
         generated,
         reconciliationContext,
@@ -560,8 +570,8 @@ export default function CanonReconciliationPanel({
       const discardedCount = Math.max(0, generated.length - normalized.length)
       const aiNotice = aiError
         ? ` A análise semântica ficou parcial: ${aiError}`
-        : modelName === "rule-engine"
-          ? " O Ollama não foi executado porque nenhum modelo foi selecionado no indicador de IA local."
+        : aiGenerated.length === 0
+          ? " A IA não encontrou consequências estruturais seguras para os registros analisados."
           : ""
       setNotice(
         newProposalCount
@@ -599,9 +609,9 @@ export default function CanonReconciliationPanel({
           </p>
           <h2 className="mt-1 text-2xl font-semibold">Consolidar Cânone</h2>
           <p className="mt-2 max-w-2xl text-sm leading-6 text-[#687065]">
-            O Rule Engine encontra consequências diretas e o Canon Reconciler local pode validar
-            ambiguidades com o Ollama. A escrita no cânone só acontece após aprovação e ação explícita
-            dos autores.
+            A IA analisa feitos, participantes, relações e tramas para propor consequências
+            estruturais. Nenhuma proposal é gerada por regra determinística; a escrita no cânone só
+            acontece após aprovação e ação explícita dos autores.
           </p>
         </div>
         <div className="flex flex-wrap justify-end gap-2">
@@ -742,6 +752,14 @@ export default function CanonReconciliationPanel({
                 </span>
               </div>
 
+              <div className="mt-3 flex flex-wrap items-center gap-2">
+                <span className="rounded-full bg-[#eef3ea] px-3 py-1 text-[11px] font-semibold text-[#52614e]">
+                  {analysisOriginLabel(currentProposal)}
+                </span>
+                <span className="rounded-full bg-[#fff8e9] px-3 py-1 text-[11px] font-semibold text-[#8d6d4c]">
+                  Revisão humana obrigatória
+                </span>
+              </div>
               <p className="mt-3 rounded-xl bg-[#eef3ea] px-3 py-2 text-xs font-semibold leading-5 text-[#52614e]">
                 {consequenceSummary(currentProposal)}
               </p>
